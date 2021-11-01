@@ -1,12 +1,13 @@
+import { Guard, GuardUtils } from 'guard/Guard';
+import { Transformer, TransformerUtils } from 'transformer/Transformer';
+import { StringKeyof, StringObject } from 'types/StringObject';
+import { UpdateInformation } from 'types/UpdateInformation';
+import { UpdateSource } from 'types/UpdateSource';
+import { WarehouseHandlers } from 'types/WarehouseHandlers';
+
 import Object from '@rbxts/object-utils';
 import { DataStoreService, HttpService, RunService } from '@rbxts/services';
 import { t } from '@rbxts/t';
-import { Guard, GuardUtils } from 'guard/Guard';
-import { UpdateSource } from 'types/UpdateSource';
-import { Transformer, TransformerUtils } from 'transformer/Transformer';
-import { UpdateInformation } from 'types/UpdateInformation';
-import { WarehouseHandlers } from 'types/WarehouseHandlers';
-import { StringKeyof, StringObject } from 'types/StringObject';
 
 /**
  * The warehouse class wraps a global data store
