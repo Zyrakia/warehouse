@@ -54,7 +54,7 @@ export class OrderedWarehouse {
 	 * @param reconcilliationValue the reconciliation value, only necessary if no warehouse exists.
 	 * @returns the ordered warehouse linked with the specified key.
 	 */
-	public static get(key: string, reconcilliationValue: number = 0) {
+	public static init(key: string, reconcilliationValue: number = 0) {
 		const existingWarehouse = OrderedWarehouse.warehouses.get(key);
 		if (existingWarehouse) return existingWarehouse;
 

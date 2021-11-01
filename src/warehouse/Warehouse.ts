@@ -64,7 +64,7 @@ export class Warehouse<Template, Document = Template> {
 	 * @param reconcilliationValue the warehouse reconcilliation value, only necessary if no warehouse exists.
 	 * @returns the warehouse linked with the specified key.
 	 */
-	public static get<Template, Document = Template>(
+	public static init<Template, Document = Template>(
 		key: string,
 		reconcilliationValue?: Template,
 	): Warehouse<Template, Document> {
