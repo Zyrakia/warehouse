@@ -8,3 +8,8 @@ export interface WarehouseHandlers<Template, Document> {
 	/** Executed right after a template in the warehouse receives an update. */
 	onUpdate?: (key: string, newTemplate: Template, oldTemplate: Template) => void;
 }
+
+export interface OrderedWarehouseHandlers {
+    /** Executed when a value in the warehouse is updated. */
+    onUpdate?: (key: string, newValue: number, oldvalue: number) => void;
+}
