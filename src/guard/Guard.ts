@@ -22,3 +22,23 @@ export interface Guard<O = any, N = O> {
 	 */
 	toString?(): string;
 }
+
+/** Utilities for working with guards. */
+export namespace GuardUtils {
+	/**
+	 * Applies specified guards to an update.
+	 *
+	 * @param guards the guards to apply.
+	 * @param info the information of the update.
+	 * @returns `true` if all guards allow the update, `false` if any guard does not.
+	 */
+	export function applyGuards(guards: Guard[], info: UpdateInformation) {
+		for (const guard of guards) {
+			const isAllowed = guard.shouldAllowUpdate(info);
+			if (isAllowed) continue;
+			return false;
+		}
+
+		return true;
+	}
+}

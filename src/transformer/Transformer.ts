@@ -25,3 +25,30 @@ export interface Transformer<O = any, N = O> {
 	 */
 	toString?(): string;
 }
+
+/** Utilities for working with transformers. */
+export namespace TransformerUtils {
+	/**
+	 * Applies specified transformers to an update.
+	 *
+	 * @param transformers the transformers to apply.
+	 * @param info the information of the update.
+	 * @returns the transformed value.
+	 */
+	export function applyTransformations<O = any, N = O>(
+		transformers: Transformer[],
+		info: UpdateInformation<O, N>,
+	) {
+		let transformedValue = info.newValue;
+
+		for (const transformer of transformers) {
+			transformedValue = transformer.transform({
+				source: info.source,
+				oldValue: info.oldValue,
+				newValue: transformedValue,
+			});
+		}
+
+		return transformedValue;
+	}
+}
