@@ -13,7 +13,7 @@ export interface Transformer<O = any, N = O> {
 	 * Should return the old value if the new value is invalid.
 	 *
 	 * @param info the information of the update.
-	 * @returns the transformed value, either {O} or {N}.
+	 * @returns the transformed value, either type of {O} or {N}.
 	 */
 	transform(info: UpdateInformation): O | N;
 
