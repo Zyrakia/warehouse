@@ -36,8 +36,8 @@ export class Warehouse<Template, Document = Template> {
 	/**
 	 * Creates a new Warehouse, if one already exists with the same key it will fail.
 	 *
-	 * @param key The key to use for the warehouse.
-	 * @param reconcilliationValue The value to reconcilliate any documents with.
+	 * @param key the key to use for the warehouse.
+	 * @param reconcilliationValue the value to reconcilliate any documents with.
 	 */
 	private constructor(key: string, reconcilliationValue: Template) {
 		if (!key || !t.string(key)) throw 'Invalid Warehouse key!';
@@ -56,12 +56,13 @@ export class Warehouse<Template, Document = Template> {
 	}
 
 	/**
-	 * Returns a Warehouse linked with the specified key.
+	 * Returns a warehouse linked with the specified key.
 	 * If one already exists it will return that one.
-	 * Otherwise it will create a new one.
+	 * Otherwise it will be created.
 	 *
-	 * @param key The key to use for the warehouse.
-	 * @param reconcilliationValue The warehouse reconcilliation value, only necessary if no warehouse exists.
+	 * @param key the key to use for the warehouse.
+	 * @param reconcilliationValue the warehouse reconcilliation value, only necessary if no warehouse exists.
+	 * @returns the warehouse linked with the specified key.
 	 */
 	public static get<Template, Document = Template>(
 		key: string,
@@ -80,14 +81,14 @@ export class Warehouse<Template, Document = Template> {
 	 * Returns the value of a specified key.
 	 * If the key is not cached it will be fetched from the DataStore.
 	 *
-	 * @param key The key to get the value of.
-	 * @returns The value of the key.
+	 * @param key the key to get the value of.
+	 * @returns the value of the key.
 	 */
 	public get(key: string) {
 		while (this.loadingKeys.has(key)) task.wait(0.1);
 
 		const foundTemplate = this.data[key];
-		if (foundTemplate) return foundTemplate;
+		if (!t.nil(foundTemplate)) return foundTemplate;
 
 		this.loadingKeys.add(key);
 
@@ -115,9 +116,9 @@ export class Warehouse<Template, Document = Template> {
 	 *
 	 * Guards and transformers will be applied on any update to the value.
 	 *
-	 * @param key The key to update.
-	 * @param template The value to update the key with.
-	 * @param source The source of the update.
+	 * @param key the key to update.
+	 * @param template the value to update the key with.
+	 * @param source the source of the update.
 	 */
 	public update(key: string, template: Partial<Template>, source: UpdateSource = 'Server') {
 		const existingTemplate = this.get(key);
@@ -179,11 +180,11 @@ export class Warehouse<Template, Document = Template> {
 
 	/**
 	 * Sets a key with a specified value.
-	 * Calls the update handler.
+	 * Calls the update handler if the value changed.
 	 *
-	 * @param key The key to set.
-	 * @param newTemplate The new value of the eky
-	 * @param oldTemplate The old value of the key.
+	 * @param key the key to set.
+	 * @param newTemplate the new value of the eky
+	 * @param oldTemplate the old value of the key.
 	 */
 	private set(key: string, newTemplate: Template, oldTemplate: Template) {
 		this.data[key] = newTemplate;
@@ -195,8 +196,8 @@ export class Warehouse<Template, Document = Template> {
 	 * Loads a key from the DataStore.
 	 * If the key is not found or invalid it will throw an error.
 	 *
-	 * @param key The key to load.
-	 * @returns The loaded value.
+	 * @param key the key to load.
+	 * @returns the loaded value.
 	 */
 	private load(key: string) {
 		const document = this.dataStore.GetAsync(key);
@@ -214,7 +215,7 @@ export class Warehouse<Template, Document = Template> {
 	 * Commits a key to the DataStore.
 	 * This deletes the cached value of the warehouse.
 	 *
-	 * @param key The key to commit.
+	 * @param key the key to commit.
 	 */
 	public commit(key: string) {
 		const template = this.get(key);
@@ -243,7 +244,7 @@ export class Warehouse<Template, Document = Template> {
 	 * otherwise, if it is nil, it will be replaced.
 	 *
 	 * @param template The value to reconcile.
-	 * @returns The reconciled value.
+	 * @returns the reconciled value.
 	 */
 	private reconcile(template?: Template): Template {
 		if (t.table(template)) return Object.assign({}, this.reconcilliationValue, template);
@@ -262,7 +263,7 @@ export class Warehouse<Template, Document = Template> {
 	 * Updates the handlers within the warehouse.
 	 * This will merge given handlers with the existing ones.
 	 *
-	 * @param handlers The handlers to update.
+	 * @param handlers the handlers to update.
 	 */
 	public updateHandlers(handlers: Partial<WarehouseHandlers<Template, Document>>) {
 		this.handlers = { ...this.handlers, ...handlers };
@@ -271,7 +272,7 @@ export class Warehouse<Template, Document = Template> {
 	/**
 	 * Adds global guards to the warehouse.
 	 *
-	 * @param guards The guards to add.
+	 * @param guards the guards to add.
 	 */
 	public addGuards(...guards: Guard[]) {
 		const existingGuards = this.globalGuards;
@@ -282,7 +283,7 @@ export class Warehouse<Template, Document = Template> {
 	/**
 	 * Adds global transformers to the warehouse.
 	 *
-	 * @param transformers The transformers to add.
+	 * @param transformers the transformers to add.
 	 */
 	public addTransformers(...transformers: Transformer[]) {
 		const existingTransformers = this.globalTransformers;
@@ -294,8 +295,8 @@ export class Warehouse<Template, Document = Template> {
 	 * Adds guards bound to a key to the warehouse.
 	 * If the internal value is not a table, these guards will never be applied.
 	 *
-	 * @param key The key to bind the guards to.
-	 * @param guards The guards to bind.
+	 * @param key the key to bind the guards to.
+	 * @param guards the guards to bind.
 	 */
 	public addBoundGuards(key: StringKeyof<Template>, ...guards: Guard[]) {
 		const existingGuards = this.boundGuards.get(key) || [];
@@ -307,8 +308,8 @@ export class Warehouse<Template, Document = Template> {
 	 * Adds transformers bound to a key to the warehouse.
 	 * If the internal value is not a table, these transformers will never be applied.
 	 *
-	 * @param key The key to bind the transformers to.
-	 * @param transformers The transformers to bind.
+	 * @param key the key to bind the transformers to.
+	 * @param transformers the transformers to bind.
 	 */
 	public addBoundTransformers(key: StringKeyof<Template>, ...transformers: Transformer[]) {
 		const existingTransformers = this.boundTransformers.get(key) || [];
