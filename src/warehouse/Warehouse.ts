@@ -213,7 +213,7 @@ export class Warehouse<Template, Document = Template> {
 
 	/**
 	 * Commits a key to the DataStore.
-	 * This deletes the cached value of the warehouse.
+	 * This deletes the cached value from the warehouse.
 	 *
 	 * @param key the key to commit.
 	 */
