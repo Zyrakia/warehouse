@@ -177,7 +177,7 @@ export class OrderedWarehouse {
 	 * Invoking this will clear the ordered cache.
 	 * If the key is found in the regular cache, it is
 	 * always preferred over the loaded value
-	 * @see {@link OrderedWarehouse.load}
+	 * @see {@link OrderedWarehouse.getOrdered}
 	 *
 	 * @param amount the amount of entries to load.
 	 */
