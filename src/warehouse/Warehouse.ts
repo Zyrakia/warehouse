@@ -98,6 +98,7 @@ export class Warehouse<Template, Document = Template> {
 
 			let template: Template | undefined;
 			if (postLoad) template = postLoad(loadedDocument);
+			else template = loadedDocument as unknown as Template;
 			template = this.reconcile(template);
 
 			this.data[key] = template;
