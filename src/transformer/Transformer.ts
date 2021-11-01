@@ -15,7 +15,7 @@ export interface Transformer<O = any, N = O> {
 	 * @param info the information of the update.
 	 * @returns the transformed value, either {O} or {N}.
 	 */
-	transformUpdate(info: UpdateInformation): O | N;
+	transform(info: UpdateInformation): O | N;
 
 	/**
 	 * Debuggin method to get the stirng representation of the transformer.
