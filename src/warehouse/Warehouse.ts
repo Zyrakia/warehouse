@@ -93,12 +93,12 @@ export class Warehouse<Template, Document = Template> {
 		this.loadingKeys.add(key);
 
 		try {
-			const loadedDocument = this.load(key);
+			let loadedDocument = this.load(key);
 			const { postLoad } = this.handlers;
 
 			let template: Template | undefined;
-			if (postLoad) template = postLoad(loadedDocument);
-			else template = loadedDocument as unknown as Template;
+			if (t.nil(loadedDocument)) template = this.reconcilliationValue;
+			else if (postLoad) template = postLoad(loadedDocument);
 			template = this.reconcile(template);
 
 			this.data[key] = template;
@@ -203,9 +203,7 @@ export class Warehouse<Template, Document = Template> {
 	private load(key: string) {
 		const document = this.dataStore.GetAsync(key);
 		try {
-			if (t.nil(document) || !t.string(document))
-				throw 'Invalid value assigned to key in store.';
-
+			if (t.nil(document) || !t.string(document)) return undefined;
 			return HttpService.JSONDecode(document) as Document;
 		} catch {
 			throw `Failed to load key ${key}!`;
