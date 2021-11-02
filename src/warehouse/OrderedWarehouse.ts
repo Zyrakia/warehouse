@@ -243,4 +243,14 @@ export class OrderedWarehouse {
 	public setBoundToGame(boundToGame: boolean) {
 		this.boundToGame = boundToGame;
 	}
+
+	/**
+	 * Updates the handlers within the warehouse.
+	 * This will merge given handlers with the existing ones.
+	 *
+	 * @param handlers the handlers to update.
+	 */
+	public updateHandlers(handlers: Partial<OrderedWarehouseHandlers>) {
+		this.handlers = { ...this.handlers, ...handlers };
+	}
 }
