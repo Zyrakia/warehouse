@@ -8,6 +8,7 @@ I know I am not the best programmer, nor do I know much about Roblox yet, nor do
 ## Features Deatures
 
 -   Only addresses the actual DataStore on load or commit.
+-   Automatically uses a MockDataStore in development mode.
 -   Fires a signal when a key updates.
 -   Automatically encodes / decodes tables, serialization is up to you though, maybe one day I will add automatic serialization for some basic things.
 -   Allows adding of transformers and guards to limit what is being put in the warehouse.
