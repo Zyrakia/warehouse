@@ -1,5 +1,4 @@
-import * as MOCK from '@rbxts/mockdatastoreservice';
-import { DataStoreService, HttpService, RunService } from '@rbxts/services';
+import { HttpService, RunService } from '@rbxts/services';
 import Signal from '@rbxts/signal';
 import { t } from '@rbxts/t';
 
@@ -28,15 +27,15 @@ export type PreCommitProcessor<ActiveDocument = any, DormantDocument = ActiveDoc
 ) => DormantDocument;
 
 /**
- * A Roblox DataStore wrapper which focuses on ease of use.
+ * A Roblox GlobalDataStore wrapper which focuses on ease of use.
  */
 export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
-	private static activeWarehouses: Map<string, Warehouse> = new Map();
+	public static readonly activeWarehouses: Map<string, Warehouse> = new Map();
 
-	protected readonly key;
-	protected readonly runMode;
-	protected readonly store;
-	protected readonly template?;
+	protected key;
+	protected runMode;
+	protected store;
+	protected template?;
 
 	protected keyUpdateSignal = new Signal<KeyUpdateHandler<ActiveDocument>>();
 	private keyDeleteSignal = new Signal<(key: string, deletedDocument: ActiveDocument) => void>();
@@ -53,51 +52,30 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 
 	/**
 	 * Constructs a new warehouse and registers it with the active warehouses.
+	 * This should **NOT** be called directly, use the {@link WarehouseFactory} instead.
 	 *
-	 * @param key The key of the warehouse.
+	 * @param rawKey The key of the warehouse.
 	 * @param template The template of the warehouse.
 	 * @param runMode The run mode of the warehouse.
 	 */
-	protected constructor(key: string, template: ActiveDocument | undefined, runMode: RunMode) {
+	public constructor(
+		rawKey: string,
+		template: ActiveDocument | undefined,
+		runMode: RunMode,
+		store: GlobalDataStore,
+	) {
+		const key = Warehouse.transformKey(rawKey);
+		if (!key) throw `The given warehouse key ('${rawKey}') is invalid.`;
+
 		this.key = key;
-		this.runMode = runMode;
 		this.template = template;
+		this.runMode = runMode;
+		this.store = store;
 
-		if (Warehouse.activeWarehouses.get(key))
-			throw `A warehouse with the key '${key}' already exists.`;
+		if (Warehouse.activeWarehouses.get(rawKey))
+			throw `A warehouse with the key '${rawKey}' already exists.`;
 
-		// If running in test mode no actual data store will be used.
-		this.store =
-			this.runMode === RunMode.TEST
-				? MOCK.GetDataStore(key)
-				: DataStoreService.GetDataStore(key);
-
-		Warehouse.activeWarehouses.set(key, this);
-	}
-
-	/**
-	 * Initializes a warehouse, creating a new one if one does not exist.
-	 * The template and runMode parameters will only be used when a warehouse does not exist.
-	 *
-	 * @param key The key of the warehouse.
-	 * @param template The template of the warehouse, used to reconcilliate any missing data.
-	 * @param runMode The run mode of the warehouse, in testing mode, no actual Roblox DataStore will be used.
-	 */
-	public static init<ActiveDocument = any, DormantDocument = ActiveDocument>(
-		key: string,
-		template?: ActiveDocument,
-		runMode?: RunMode,
-	): Warehouse<ActiveDocument, DormantDocument> {
-		const transformedKey = this.transformKey(key);
-		if (!transformedKey) throw `The given warehouse key ('${key}') is invalid.`;
-
-		// When in Studio, the Warehouse will run in test mode, unless explicitly told otherwise.
-		runMode = t.nil(runMode) ? (RunService.IsStudio() ? RunMode.TEST : RunMode.LIVE) : runMode;
-
-		const activeWarehouse = this.activeWarehouses.get(transformedKey);
-		if (activeWarehouse) return activeWarehouse;
-
-		return new Warehouse(transformedKey, template, runMode);
+		Warehouse.activeWarehouses.set(rawKey, this);
 	}
 
 	/**
@@ -318,12 +296,23 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	 * @param rawKey The key to transform.
 	 * @returns The transformed key, or undefined if the key is invalid.
 	 */
-	protected static transformKey(rawKey: string | Player) {
+	public static transformKey(rawKey: string | Player) {
 		const key = t.string(rawKey) ? rawKey : tostring(rawKey.UserId);
 		if (!key) return;
 		const [result, _] = string.gsub(key, '%s+', '');
 		if (!result) return;
 		return result;
+	}
+
+	/**
+	 * Decides the appropriate run mode for the warehouse.
+	 * When running in studio, it will always be dev mode unless
+	 * explicitly set otherwise.
+	 *
+	 * @param runMode The run mode to use, can be omitted.
+	 */
+	public static decideRunMode(runMode?: RunMode) {
+		return t.nil(runMode) ? (RunService.IsStudio() ? RunMode.DEV : RunMode.PROD) : runMode;
 	}
 
 	/**
@@ -334,11 +323,11 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	}
 
 	/**
-	 * Returns the internal datastore.
-	 * If not running in test mode, this will return nothing.
+	 * Returns the internal DataStire.
+	 * If not running in dev mode, this will return nothing.
 	 */
 	public getStore() {
-		if (this.runMode === RunMode.TEST) return this.store;
+		if (this.runMode === RunMode.DEV) return this.store;
 	}
 
 	/**
