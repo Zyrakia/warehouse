@@ -53,7 +53,7 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 			entries.push([key, value]);
 		}
 
-		return entries.sort((a, b) => (order === SortOrder.ASCENDING ? a[1] < b[1] : b[1] > a[1]));
+		return entries.sort((a, b) => (order === SortOrder.ASCENDING ? a[1] < b[1] : a[1] > b[1]));
 	}
 
 	/**
