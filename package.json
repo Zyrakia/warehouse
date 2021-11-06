@@ -6,7 +6,7 @@
     "scripts": {
         "build": "rbxtsc",
         "watch": "rbxtsc -w",
-        "test": "rbxtsc --type=game && rojo build -o ./test.rbxlx && run-in-roblox --place ./test.rbxlx --script ./build/test-runner.lua",
+        "test": "rbxtsc --type=game && rojo build -o ./test.rbxlx && run-in-roblox --place ./test.rbxlx --script ./build/test-runner.server.lua",
         "prepublishOnly": "yarn run build"
     },
     "types": "build/index.d.ts",
