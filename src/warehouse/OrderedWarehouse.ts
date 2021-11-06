@@ -48,13 +48,27 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 	 * @returns The loaded entries in the specified order.
 	 */
 	public getOrdered(order = SortOrder.DESCENDING) {
+		const entries = this.getOrderedRaw();
+		return entries.sort((a, b) => (order === SortOrder.ASCENDING ? a[1] < b[1] : a[1] > b[1]));
+	}
+
+	/**
+	 * Gets the loaded ordered cache in no specific order.
+	 * This will not ensure the order of the entries.
+	 *
+	 * @see {@link OrderedWarehouse.getOrdered}
+	 * @see {@link OrderedWarehouse.loadOrdered}
+	 *
+	 * @returns The loaded ordered cache as an array.
+	 */
+	public getOrderedRaw() {
 		const entries: [key: string, value: number][] = [];
 
 		for (const [key, value] of this.orderedCache) {
 			entries.push([key, value]);
 		}
 
-		return entries.sort((a, b) => (order === SortOrder.ASCENDING ? a[1] < b[1] : a[1] > b[1]));
+		return entries;
 	}
 
 	/**
