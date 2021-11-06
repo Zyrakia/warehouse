@@ -1,4 +1,4 @@
 export enum RunMode {
-	TEST,
-	LIVE,
+	DEV = 'Development',
+	PROD = 'Production',
 }
