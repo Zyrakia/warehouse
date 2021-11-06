@@ -30,7 +30,7 @@ export type PreCommitProcessor<ActiveDocument = any, DormantDocument = ActiveDoc
  * A Roblox GlobalDataStore wrapper which focuses on ease of use.
  */
 export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
-	public static readonly activeWarehouses: Map<string, Warehouse> = new Map();
+	protected static readonly activeWarehouses: Map<string, Warehouse> = new Map();
 
 	protected key;
 	protected runMode;
@@ -38,10 +38,12 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	protected template?;
 
 	protected keyUpdateSignal = new Signal<KeyUpdateHandler<ActiveDocument>>();
-	private keyDeleteSignal = new Signal<(key: string, deletedDocument: ActiveDocument) => void>();
+	protected keyDeleteSignal = new Signal<
+		(key: string, deletedDocument: ActiveDocument) => void
+	>();
 
-	private postLoadProcessor?: PostLoadProcessor<ActiveDocument, DormantDocument>;
-	private preCommitProcessor?: PreCommitProcessor<ActiveDocument, DormantDocument>;
+	protected postLoadProcessor?: PostLoadProcessor<ActiveDocument, DormantDocument>;
+	protected preCommitProcessor?: PreCommitProcessor<ActiveDocument, DormantDocument>;
 
 	protected cache = new Map<string, ActiveDocument>();
 	protected loadingKeys = new Set<string>();
@@ -76,6 +78,15 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 			throw `A warehouse with the key '${rawKey}' already exists.`;
 
 		Warehouse.activeWarehouses.set(rawKey, this);
+	}
+
+	/**
+	 * Gets the active warehouse for the given key.
+	 *
+	 * @param key The key of the warehouse.
+	 */
+	public static getActiveWarehouse(key: string) {
+		return Warehouse.activeWarehouses.get(key);
 	}
 
 	/**
@@ -183,7 +194,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	/**
 	 * Deletes a key from the cache and saves the value in the store.
 	 *
-	 * @param key The key to delete.
+	 * @param key The key to commit.
 	 */
 	public commit(rawKey: string | Player) {
 		const key = Warehouse.transformKey(rawKey);
@@ -205,6 +216,27 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 
 		this.delete(key);
 		this.commitingKeys.delete(key);
+	}
+
+	/**
+	 * Asynchronously commits all the keys in the warehouse.
+	 * @see {@link Warehouse.commit}
+	 *
+	 * @returns A promise that resolves when all keys have been committed.
+	 */
+	public commitAll() {
+		const promises: Promise<void>[] = [];
+
+		for (const [key, _] of this.cache) {
+			const promise = new Promise<void>((resolve) => {
+				this.commit(key);
+				resolve();
+			});
+
+			promises.push(promise);
+		}
+
+		return Promise.all(promises);
 	}
 
 	/**
