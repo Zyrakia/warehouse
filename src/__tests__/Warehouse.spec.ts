@@ -253,7 +253,7 @@ export = () => {
 				expect(timesCalled).to.equal(1);
 			});
 
-			it('should not commit keys if they are already being commited', () => {
+			it('should not commit keys if they are already being committed', () => {
 				const warehouse = WarehouseFactory.init('commit_debounce');
 				warehouse.set('number', 123);
 
