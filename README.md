@@ -1,3 +1,5 @@
+> READ: This is a library made by me, for me, published because it was the easiest thing to do, and I wanted to try publishing a roblox-ts package, if you decide to use this, it means that you are okay with a package in your dependency tree that is incomplete, could lose support at any moment, and will likely be abandoned one day.
+
 # Warehouse
 
 A basic DataStore abstraction library made kind of for myself, just so I could get the hang of making roblox-ts packages, but maybe it can be of some use?
