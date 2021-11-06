@@ -1,7 +1,7 @@
 import * as MOCK from '@rbxts/mockdatastoreservice';
 import { DataStoreService } from '@rbxts/services';
 import { RunMode } from 'index';
-import { OrderedWarehouse } from '../OrderedWarehouse';
+import { OrderedWarehouse } from './OrderedWarehouse';
 import { Warehouse } from './Warehouse';
 
 export namespace WarehouseFactory {
