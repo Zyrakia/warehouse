@@ -1,6 +1,7 @@
 import { t } from '@rbxts/t';
-import { Guard } from '../Guard';
+
 import { UpdateInformation } from '../../types/UpdateInformation';
+import { Guard } from '../Guard';
 
 /** A guard that only passes if the new value is >= min and <= max. */
 export class ClampGuard implements Guard {

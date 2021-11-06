@@ -1,10 +1,11 @@
-import { DataStoreService, HttpService, RunService } from '@rbxts/services';
-import { t } from '@rbxts/t';
 import * as MOCK from '@rbxts/mockdatastoreservice';
-import { RunMode } from '../types/RunMode';
+import { DataStoreService, HttpService, RunService } from '@rbxts/services';
 import Signal from '@rbxts/signal';
+import { t } from '@rbxts/t';
+
 import { Guard, GuardUtils } from '../guard/Guard';
 import { Transformer, TransformerUtils } from '../transformer/Transformer';
+import { RunMode } from '../types/RunMode';
 import { UpdateSource } from '../types/UpdateSource';
 
 export type KeyUpdateHandler<ActiveDocument = any> = (

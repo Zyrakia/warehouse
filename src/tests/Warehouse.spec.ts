@@ -1,9 +1,11 @@
 import { RunMode } from 'types/RunMode';
-import { Warehouse } from '../warehouse/Warehouse';
-import { HttpService } from '@rbxts/services';
+
 import Object from '@rbxts/object-utils';
-import { IncrementTransformer } from '../transformer/default-transformers/IncrementTransformer';
+import { HttpService } from '@rbxts/services';
+
 import { ReadonlyGuard } from '../guard/default-guards/ReadonlyGuard';
+import { IncrementTransformer } from '../transformer/default-transformers/IncrementTransformer';
+import { Warehouse } from '../warehouse/Warehouse';
 
 function createFakePlayer() {
 	const player = {

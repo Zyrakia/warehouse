@@ -1,11 +1,12 @@
 import Object from '@rbxts/object-utils';
 import { DataStoreService, RunService } from '@rbxts/services';
 import { t } from '@rbxts/t';
+
 import { Guard, GuardUtils } from '../guard/Guard';
-import { UpdateSource } from '../types/UpdateSource';
 import { Transformer, TransformerUtils } from '../transformer/Transformer';
 import { SortOrder } from '../types/SortOrder';
 import { StringObject } from '../types/StringObject';
+import { UpdateSource } from '../types/UpdateSource';
 import { OrderedWarehouseHandlers } from '../types/WarehouseHandlers';
 
 export class OrderedWarehouse {
