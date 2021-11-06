@@ -9,9 +9,9 @@
         "test": "rbxtsc --type=game && rojo build -o ./test.rbxlx && run-in-roblox --place ./test.rbxlx --script ./build/test-runner.lua",
         "prepublishOnly": "yarn run build"
     },
-    "types": "out/index.d.ts",
+    "types": "build/index.d.ts",
     "files": [
-        "out"
+        "build/**/!(*.spec|*.server).(lua|d.ts)"
     ],
     "publishConfig": {
         "access": "public"
