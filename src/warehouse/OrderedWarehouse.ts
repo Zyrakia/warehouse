@@ -1,5 +1,6 @@
 import Signal from '@rbxts/signal';
 import { t } from '@rbxts/t';
+import { Maps } from 'utils/Maps';
 
 import { RunMode } from '../types/RunMode';
 import { SortOrder } from '../types/SortOrder';
@@ -62,13 +63,7 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 	 * @returns The loaded ordered cache as an array.
 	 */
 	public getOrderedRaw() {
-		const entries: [key: string, value: number][] = [];
-
-		for (const [key, value] of this.orderedCache) {
-			entries.push([key, value]);
-		}
-
-		return entries;
+		return Maps.mapToEntries(this.orderedCache);
 	}
 
 	/**
@@ -130,15 +125,48 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 		for (const entry of page) {
 			const { key, value } = entry;
 			if (!t.string(key) || !t.number(value)) continue;
-
-			const cachedValue = this.cache.get(key);
-			if (!t.nil(cachedValue)) this.orderedCache.set(key, cachedValue);
-			else this.orderedCache.set(key, value);
+			this.orderedCache.set(key, value);
 		}
 
+		this.mergeCacheIntoOrderedCache(amount, order);
 		this.orderedCacheUpdatedSignal.Fire();
 	}
 
+	/**
+	 * This will merge the current cache into the ordered cache,
+	 * sort the merge and then load the specified amount of entries into
+	 * the ordered cache.
+	 *
+	 * @param amount The amount of entries to load. (0 - 100, default: 50)
+	 * @param order The order to sort the entries by.
+	 */
+	private mergeCacheIntoOrderedCache(amount = 50, order = SortOrder.DESCENDING) {
+		const entries = Maps.mapToEntries(this.cache);
+		const orderedEntries = this.getOrderedRaw().filter(([key]) => !this.cache.has(key));
+		const allEntries = [...entries, ...orderedEntries];
+		const allSortedEntries = this.sortEntriesArray(allEntries, order);
+		const entriesToCache = allSortedEntries.filter((_, i) => i < amount);
+		this.orderedCache = Maps.entriesToMap(entriesToCache);
+	}
+
+	/**
+	 * Sorts an array of entries by the specified order.
+	 *
+	 * @param entries The entries to sort.
+	 * @param order The order to sort the entries by.
+	 * @returns The sorted entries.
+	 */
+	private sortEntriesArray(array: [key: string, value: number][], order = SortOrder.DESCENDING) {
+		return array.sort((a, b) => (order === SortOrder.ASCENDING ? a[1] < b[1] : a[1] > b[1]));
+	}
+
+	/**
+	 * Updates the ordered cache with the specified key and value.
+	 * If the key is not found in the ordered cache, nothing will happen.
+	 *
+	 * @param key The key to update.
+	 * @param value The value to update with.
+	 */
 	private reconciliateOrderedCache(key: string, value: number) {
 		const previousValue = this.orderedCache.get(key);
 		if (!previousValue || previousValue === value) return;
