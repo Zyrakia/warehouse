@@ -192,11 +192,12 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	}
 
 	/**
-	 * Deletes a key from the cache and saves the value in the store.
+	 * Saves the value to the store, and may delete the value from the cache.
 	 *
 	 * @param key The key to commit.
+	 * @param soft If true, the value will not be deleted from the cache.
 	 */
-	public commit(rawKey: string | Player) {
+	public commit(rawKey: string | Player, soft = false) {
 		const key = Warehouse.transformKey(rawKey);
 		if (!key) throw `The given key ('${rawKey}') is invalid.`;
 
@@ -214,7 +215,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 
 		this.store.SetAsync(key, encodedDocument);
 
-		this.delete(key);
+		if (!soft) this.delete(key);
 		this.commitingKeys.delete(key);
 	}
 
@@ -222,14 +223,15 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	 * Asynchronously commits all the keys in the warehouse.
 	 * @see {@link Warehouse.commit}
 	 *
+	 * @param soft If true, the value will not be deleted from the cache.
 	 * @returns A promise that resolves when all keys have been committed.
 	 */
-	public commitAll() {
+	public commitAll(soft = false) {
 		const promises: Promise<void>[] = [];
 
 		for (const [key, _] of this.cache) {
 			const promise = new Promise<void>((resolve) => {
-				this.commit(key);
+				this.commit(key, soft);
 				resolve();
 			});
 
