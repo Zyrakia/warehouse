@@ -6,6 +6,7 @@
     "scripts": {
         "build": "rbxtsc",
         "watch": "rbxtsc -w",
+        "test": "rbxtsc --type=game && rojo build -o ./test.rbxlx && run-in-roblox --place ./test.rbxlx --script ./build/test-runner.lua",
         "prepublishOnly": "yarn run build"
     },
     "types": "out/index.d.ts",
@@ -20,7 +21,6 @@
         "@rbxts/types": "^1.0.546"
     },
     "dependencies": {
-        "@rbxts/fitumi": "^1.0.11",
         "@rbxts/mockdatastoreservice": "^1.0.2",
         "@rbxts/object-utils": "^1.0.4",
         "@rbxts/services": "^1.2.0",

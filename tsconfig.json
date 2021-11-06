@@ -15,10 +15,10 @@
 		"typeRoots": ["node_modules/@rbxts"],
 		"types": ["@rbxts/testez/globals"],
 		"rootDir": "src",
-		"outDir": "out",
+		"outDir": "build",
 		"baseUrl": "src",
 		"incremental": true,
-		"tsBuildInfoFile": "out/tsconfig.tsbuildinfo",
+		"tsBuildInfoFile": "build/tsconfig.tsbuildinfo",
 		"declaration": true
 	}
 }
