@@ -5,7 +5,7 @@ import { HttpService } from '@rbxts/services';
 
 import { ReadonlyGuard } from '../guard/default-guards/ReadonlyGuard';
 import { IncrementTransformer } from '../transformer/default-transformers/IncrementTransformer';
-import { Warehouse } from '../warehouse/Warehouse';
+import { WarehouseFactory } from '../warehouse/WarehouseFactory';
 
 function createFakePlayer() {
 	const player = {
@@ -19,29 +19,29 @@ function createFakePlayer() {
 export = () => {
 	describe('initialization', () => {
 		it('should be created', () => {
-			const warehouse = Warehouse.init('warehouse');
+			const warehouse = WarehouseFactory.init('warehouse');
 			expect(warehouse).to.be.ok();
 		});
 
 		it('should throw when created with an invalid key', () => {
-			expect(() => Warehouse.init('')).to.throw();
+			expect(() => WarehouseFactory.init('')).to.throw();
 		});
 
 		it('should remove spaces from keys', () => {
 			const key = 'this is a key';
-			const warehouse = Warehouse.init(key);
+			const warehouse = WarehouseFactory.init(key);
 			expect(warehouse.getKey()).to.equal('thisisakey');
 		});
 
 		it('should not create multiple for the same key', () => {
-			const warehouse = Warehouse.init('warehouse');
-			const warehouse2 = Warehouse.init('warehouse');
+			const warehouse = WarehouseFactory.init('warehouse');
+			const warehouse2 = WarehouseFactory.init('warehouse');
 			expect(warehouse).to.equal(warehouse2);
 		});
 
 		it('should be in mock mode when in studio', () => {
-			const warehouse = Warehouse.init('warehouse');
-			expect(warehouse.getRunMode()).to.equal(RunMode.TEST);
+			const warehouse = WarehouseFactory.init('warehouse');
+			expect(warehouse.getRunMode()).to.equal(RunMode.DEV);
 			const store = warehouse.getStore();
 			expect(store).to.be.ok();
 		});
@@ -50,23 +50,23 @@ export = () => {
 	describe('data', () => {
 		describe('loading', () => {
 			it('should apply a string template', () => {
-				const warehouse = Warehouse.init('loading_string', 'template');
+				const warehouse = WarehouseFactory.init('loading_string', 'template');
 				expect(warehouse.get('neverSeen')).to.equal('template');
 			});
 
 			it('should apply a number template', () => {
-				const warehouse = Warehouse.init('loading_number', 123);
+				const warehouse = WarehouseFactory.init('loading_number', 123);
 				expect(warehouse.get('neverSeen')).to.equal(123);
 			});
 
 			it('should apply a boolean template', () => {
-				const warehouse = Warehouse.init('loading_boolean', true);
+				const warehouse = WarehouseFactory.init('loading_boolean', true);
 				expect(warehouse.get('neverSeen')).to.equal(true);
 			});
 
 			it('should apply a table template', () => {
 				const template = { key: 'value' };
-				const warehouse = Warehouse.init('loading_table', template);
+				const warehouse = WarehouseFactory.init('loading_table', template);
 				const value = warehouse.get('neverSeen');
 				expect(Object.deepEquals(value, template)).to.be.ok();
 
@@ -78,31 +78,31 @@ export = () => {
 
 			it('should apply an array template', () => {
 				const template = [1, 2, 3, 4, 5];
-				const warehouse = Warehouse.init('loading_array', template);
+				const warehouse = WarehouseFactory.init('loading_array', template);
 				expect(warehouse.get('neverSeen')).to.equal(template);
 			});
 
 			it('should handle undefined template', () => {
 				const template = undefined;
-				const warehouse = Warehouse.init('loading_undefined', template);
+				const warehouse = WarehouseFactory.init('loading_undefined', template);
 				expect(warehouse.get('neverSeen')).to.equal(template);
 			});
 
 			it('should accept a player as a key', () => {
 				const fakePlayer = createFakePlayer();
-				const warehouse = Warehouse.init('player_key', true);
+				const warehouse = WarehouseFactory.init('player_key', true);
 				expect(warehouse.get(fakePlayer)).to.equal(true);
 				warehouse.set(fakePlayer, false);
 				expect(warehouse.get(fakePlayer)).to.equal(false);
 			});
 
 			it('should throw on invalid key', () => {
-				const warehouse = Warehouse.init('loading_invalid_key');
+				const warehouse = WarehouseFactory.init('loading_invalid_key');
 				expect(() => warehouse.get('')).to.throw();
 			});
 
 			it('use registered loading processor', () => {
-				const warehouse = Warehouse.init('loading_processor');
+				const warehouse = WarehouseFactory.init('loading_processor');
 				warehouse.set('someValue', 0);
 				warehouse.commit('someValue');
 
@@ -117,7 +117,7 @@ export = () => {
 			});
 
 			it('should not load keys if they are already being loaded', () => {
-				const warehouse = Warehouse.init('loading_debounce');
+				const warehouse = WarehouseFactory.init('loading_debounce');
 				warehouse.set('someValue', 0);
 				warehouse.commit('someValue');
 
@@ -135,7 +135,7 @@ export = () => {
 		});
 
 		describe('storing', () => {
-			const warehouse = Warehouse.init('storing');
+			const warehouse = WarehouseFactory.init('storing');
 
 			it('should store strings', () => {
 				warehouse.set('string', 'value');
@@ -182,7 +182,7 @@ export = () => {
 		});
 
 		describe('saving', () => {
-			const warehouse = Warehouse.init('saving');
+			const warehouse = WarehouseFactory.init('saving');
 
 			it('should save strings', () => {
 				warehouse.set('string', 'value');
@@ -239,7 +239,7 @@ export = () => {
 			});
 
 			it('should use registered commit processor', () => {
-				const warehouse = Warehouse.init('saving_processor');
+				const warehouse = WarehouseFactory.init('saving_processor');
 				warehouse.set('number', 123);
 
 				let timesCalled = 0;
@@ -254,7 +254,7 @@ export = () => {
 			});
 
 			it('should not commit keys if they are already being commited', () => {
-				const warehouse = Warehouse.init('commit_debounce');
+				const warehouse = WarehouseFactory.init('commit_debounce');
 				warehouse.set('number', 123);
 
 				let timesCalled = 0;
@@ -272,7 +272,7 @@ export = () => {
 	});
 
 	describe('signals', () => {
-		const warehouse = Warehouse.init('signals');
+		const warehouse = WarehouseFactory.init('signals');
 
 		it('fires update signal when value changes', () => {
 			let timesCalled = 0;
@@ -301,7 +301,7 @@ export = () => {
 
 	describe('transformers and guards', () => {
 		it('applies transformers on update', () => {
-			const warehouse = Warehouse.init('transformers');
+			const warehouse = WarehouseFactory.init('transformers');
 			warehouse.set('number', 0);
 			warehouse.addTransformers(new IncrementTransformer());
 			warehouse.set('number', 2);
@@ -309,7 +309,7 @@ export = () => {
 		});
 
 		it('applies guards on update', () => {
-			const warehouse = Warehouse.init('guards');
+			const warehouse = WarehouseFactory.init('guards');
 			warehouse.set('number', 0);
 			warehouse.addGuards(new ReadonlyGuard());
 			warehouse.set('number', 1);
