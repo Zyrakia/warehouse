@@ -1,7 +1,8 @@
 {
     "name": "@rbxts/warehouse",
-    "version": "0.2.6",
-    "main": "out/init.lua",
+    "description": "A Roblox DataStore abstraction library.",
+    "version": "0.0.0",
+    "main": "build/init.lua",
     "license": "MIT",
     "scripts": {
         "build": "rbxtsc",
@@ -9,16 +10,29 @@
         "test": "rbxtsc --type=game && rojo build -o ./test.rbxlx && run-in-roblox --place ./test.rbxlx --script ./build/test-runner.server.lua",
         "prepublishOnly": "yarn run build"
     },
+    "author": {
+        "name": "Zyrakia"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/zyrakia/warehouse"
+    },
+    "bugs": {
+        "url": "https://github.com/zyrakia/warehouse/issues"
+    },
+    "keywords": [
+        "roblox",
+        "rbxts",
+        "datastore",
+        "warehouse",
+        "data"
+    ],
     "types": "build/index.d.ts",
     "files": [
         "build/**/!(*.spec|*.server).(lua|d.ts)"
     ],
     "publishConfig": {
         "access": "public"
-    },
-    "devDependencies": {
-        "@rbxts/compiler-types": "^1.2.7-types.0",
-        "@rbxts/types": "^1.0.546"
     },
     "dependencies": {
         "@rbxts/mockdatastoreservice": "^1.0.2",
@@ -27,5 +41,9 @@
         "@rbxts/signal": "^1.0.3",
         "@rbxts/t": "^2.2.1",
         "@rbxts/testez": "^0.3.1-ts.6"
+    },
+    "devDependencies": {
+        "@rbxts/compiler-types": "^1.2.7-types.0",
+        "@rbxts/types": "^1.0.546"
     }
 }

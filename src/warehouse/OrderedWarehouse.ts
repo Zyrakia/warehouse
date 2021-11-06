@@ -104,12 +104,14 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 	 *
 	 * @param amount The amount of entries to load. (0 - 100, default: 50)
 	 */
-	public loadOrdered(amount = 50) {
+	public loadOrdered(amount = 50, order = SortOrder.DESCENDING) {
 		if (!t.numberConstrained(0, 100)(amount))
 			throw `The amount of entries to load must be between 0 and 100.`;
 
 		this.orderedCache.clear();
-		const page = this.store.GetSortedAsync(false, amount).GetCurrentPage();
+		const page = this.store
+			.GetSortedAsync(order === SortOrder.ASCENDING, amount)
+			.GetCurrentPage();
 
 		for (const entry of page) {
 			const { key, value } = entry;
