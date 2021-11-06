@@ -28,9 +28,9 @@ export = () => {
 		});
 
 		it('should remove spaces from keys', () => {
-			const key = 'this is a key';
+			const key = 's e n t e n c e';
 			const warehouse = WarehouseFactory.init(key);
-			expect(warehouse.getKey()).to.equal('thisisakey');
+			expect(warehouse.getKey()).to.equal('sentence');
 		});
 
 		it('should not create multiple for the same key', () => {
