@@ -1,5 +1,6 @@
 import Signal from '@rbxts/signal';
 import { t } from '@rbxts/t';
+
 import { RunMode } from '../types/RunMode';
 import { SortOrder } from '../types/SortOrder';
 import { UpdateSource } from '../types/UpdateSource';
