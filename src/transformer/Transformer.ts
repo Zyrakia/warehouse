@@ -18,7 +18,7 @@ export interface Transformer<O = any, N = O> {
 	transform(info: UpdateInformation): O | N;
 
 	/**
-	 * Debuggin method to get the stirng representation of the transformer.
+	 * Debugging method to get the string representation of the transformer.
 	 * This will be used when the transformer transforms an update.
 	 *
 	 * Recommended format is `TransformerName(param1Name: param1Value, ...)

@@ -11,7 +11,7 @@ export namespace WarehouseFactory {
 	 * The template and runMode parameters will only be used when a warehouse does not exist.
 	 *
 	 * @param key The key of the warehouse.
-	 * @param template The template of the warehouse, used to reconcilliate any missing data.
+	 * @param template The template of the warehouse, used to reconciliate any missing data.
 	 * @param runMode The run mode of the warehouse, in development mode, no actual Roblox DataStore will be used.
 	 */
 	export function init<ActiveDocument = any, DormantDocument = ActiveDocument>(
@@ -38,7 +38,7 @@ export namespace WarehouseFactory {
 	 * The template defaults to 0 if omitted.
 	 *
 	 * @param key The key of the warehouse.
-	 * @param template The template of the warehouse, used to reconcilliate any missing key.
+	 * @param template The template of the warehouse, used to reconciliate any missing key.
 	 * @param runMode The run mode of the warehouse, in development mode, no actual Roblox DataStore will be used.
 	 */
 	export function initOrdered(key: string, template = 0, runMode?: RunMode): OrderedWarehouse {

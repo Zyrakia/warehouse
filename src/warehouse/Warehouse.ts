@@ -47,7 +47,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 
 	protected cache = new Map<string, ActiveDocument>();
 	protected loadingKeys = new Set<string>();
-	protected commitingKeys = new Set<string>();
+	protected committingKeys = new Set<string>();
 
 	protected transformers: Transformer[] = [];
 	protected guards: Guard[] = [];
@@ -201,10 +201,10 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 		const key = Warehouse.transformKey(rawKey);
 		if (!key) throw `The given key ('${rawKey}') is invalid.`;
 
-		if (this.commitingKeys.has(key)) return;
+		if (this.committingKeys.has(key)) return;
 		if (!this.cache.has(key)) return;
 
-		this.commitingKeys.add(key);
+		this.committingKeys.add(key);
 		const activeDocument = this.cache.get(key) as ActiveDocument;
 		const dormantDocument = this.transformActiveDocument(activeDocument);
 
@@ -216,7 +216,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 		this.store.SetAsync(key, encodedDocument);
 
 		if (!soft) this.delete(key);
-		this.commitingKeys.delete(key);
+		this.committingKeys.delete(key);
 	}
 
 	/**
@@ -268,7 +268,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	}
 
 	/**
-	 * Attemps to decode a string as JSON.
+	 * Attempts to decode a string as JSON.
 	 *
 	 * @param encodedData The raw JSON string to decode.
 	 * @returns The decoded JSON table, or undefined if the string is not valid JSON.
@@ -357,7 +357,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	}
 
 	/**
-	 * Returns the internal DataStire.
+	 * Returns the internal DataStore.
 	 * If not running in dev mode, this will return nothing.
 	 */
 	public getStore() {
@@ -388,7 +388,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	/**
 	 * Sets a processor that is called after the data is loaded from the store.
 	 * This can be useful to transform the data before it is used, to apply
-	 * things like serializtion.
+	 * things like serialization.
 	 *
 	 * This will **NOT** be called when there is no data in the store for the key,
 	 * in this case the value will always be the template, and the processor is not needed.
