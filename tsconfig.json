@@ -13,6 +13,7 @@
 		"strict": true,
 		"target": "ESNext",
 		"typeRoots": ["node_modules/@rbxts"],
+		"types": ["@rbxts/testez/globals"],
 		"rootDir": "src",
 		"outDir": "out",
 		"baseUrl": "src",

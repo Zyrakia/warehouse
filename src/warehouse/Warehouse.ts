@@ -1,318 +1,407 @@
-import { Guard, GuardUtils } from 'guard/Guard';
-import { Transformer, TransformerUtils } from 'transformer/Transformer';
-import { StringKeyof, StringObject } from 'types/StringObject';
-import { UpdateInformation } from 'types/UpdateInformation';
-import { UpdateSource } from 'types/UpdateSource';
-import { WarehouseHandlers } from 'types/WarehouseHandlers';
-
-import Object from '@rbxts/object-utils';
 import { DataStoreService, HttpService, RunService } from '@rbxts/services';
 import { t } from '@rbxts/t';
+import * as MOCK from '@rbxts/mockdatastoreservice';
+import { RunMode } from 'types/RunMode';
+import Signal from '@rbxts/signal';
+import { Guard, GuardUtils, Transformer, TransformerUtils, UpdateSource } from 'index';
+
+export type KeyUpdateHandler<ActiveDocument = any> = (
+	key: string,
+	newDocument: ActiveDocument,
+	oldDocument: ActiveDocument,
+) => void;
+
+export type KeyDeleteHandler<ActiveDocument = any> = (
+	key: string,
+	deletedDocument: ActiveDocument,
+) => void;
+
+export type PostLoadProcessor<ActiveDocument = any, DormantDocument = ActiveDocument> = (
+	document: DormantDocument,
+) => ActiveDocument;
+
+export type PreCommitProcessor<ActiveDocument = any, DormantDocument = ActiveDocument> = (
+	document: ActiveDocument,
+) => DormantDocument;
 
 /**
- * The warehouse class wraps a global data store
- * and provides extra features like guarding and transforming.
- *
- * @template Template the type of the data while it is active.
- * @template Document the type of the data while it is stored.
+ * A Roblox DataStore wrapper which focuses on ease of use.
  */
-export class Warehouse<Template, Document = Template> {
-	private static warehouses = new Map<string, Warehouse<any, any>>();
+export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
+	private static activeWarehouses: Map<string, Warehouse> = new Map();
 
-	private dataStore: GlobalDataStore;
-	private data: StringObject<Template> = {};
-	private reconcilliationValue: Template;
-	private loadingKeys = new Set<string>();
+	protected readonly key;
+	protected readonly runMode;
+	protected readonly store;
+	protected readonly template?;
 
-	private handlers: WarehouseHandlers<Template, Document> = {};
-	private boundToGame = false;
+	protected keyUpdateSignal = new Signal<KeyUpdateHandler<ActiveDocument>>();
+	private keyDeleteSignal = new Signal<(key: string, deletedDocument: ActiveDocument) => void>();
 
-	private globalGuards: Guard[] = [];
-	private globalTransformers: Transformer[] = [];
+	private postLoadProcessor?: PostLoadProcessor<ActiveDocument, DormantDocument>;
+	private preCommitProcessor?: PreCommitProcessor<ActiveDocument, DormantDocument>;
 
-	private boundGuards = new Map<string, Guard[]>();
-	private boundTransformers = new Map<string, Transformer[]>();
+	protected cache = new Map<string, ActiveDocument>();
+	protected loadingKeys = new Set<string>();
+	protected commitingKeys = new Set<string>();
+
+	protected transformers: Transformer[] = [];
+	protected guards: Guard[] = [];
 
 	/**
-	 * Creates a new Warehouse, if one already exists with the same key it will fail.
+	 * Constructs a new warehouse and registers it with the active warehouses.
 	 *
-	 * @param key the key to use for the warehouse.
-	 * @param reconcilliationValue the value to reconcilliate any documents with.
+	 * @param key The key of the warehouse.
+	 * @param template The template of the warehouse.
+	 * @param runMode The run mode of the warehouse.
 	 */
-	private constructor(key: string, reconcilliationValue: Template) {
-		if (!key || !t.string(key)) throw 'Invalid Warehouse key!';
+	private constructor(key: string, template: ActiveDocument | undefined, runMode: RunMode) {
+		this.key = key;
+		this.runMode = runMode;
+		this.template = template;
 
-		if (RunService.IsStudio()) key = `S|${key}`;
+		if (Warehouse.activeWarehouses.get(key))
+			throw `A warehouse with the key '${key}' already exists.`;
 
-		this.dataStore = DataStoreService.GetDataStore(key);
-		this.reconcilliationValue = reconcilliationValue;
+		// If running in test mode no actual data store will be used.
+		this.store =
+			this.runMode === RunMode.TEST
+				? MOCK.GetDataStore(key)
+				: DataStoreService.GetDataStore(key);
 
-		game.BindToClose(() => {
-			if (!this.boundToGame) return;
-			this.commitAll();
-		});
-
-		Warehouse.warehouses.set(key, this);
+		Warehouse.activeWarehouses.set(key, this);
 	}
 
 	/**
-	 * Returns a warehouse linked with the specified key.
-	 * If one already exists it will return that one.
-	 * Otherwise it will be created.
+	 * Initializes a warehouse, creating a new one if one does not exist.
+	 * The template and runMode parameters will only be used when a warehouse does not exist.
 	 *
-	 * @param key the key to use for the warehouse.
-	 * @param reconcilliationValue the warehouse reconcilliation value, only necessary if no warehouse exists.
-	 * @returns the warehouse linked with the specified key.
+	 * @param key The key of the warehouse.
+	 * @param template The template of the warehouse, used to reconcilliate any missing data.
+	 * @param runMode The run mode of the warehouse, in testing mode, no actual Roblox DataStore will be used.
 	 */
-	public static init<Template, Document = Template>(
+	public static init<ActiveDocument = any, DormantDocument = ActiveDocument>(
 		key: string,
-		reconcilliationValue?: Template,
-	): Warehouse<Template, Document> {
-		const existingWarehouse = Warehouse.warehouses.get(key);
-		if (existingWarehouse) return existingWarehouse;
+		template?: ActiveDocument,
+		runMode?: RunMode,
+	): Warehouse<ActiveDocument, DormantDocument> {
+		const transformedKey = this.transformKey(key);
+		if (!transformedKey) throw `The given warehouse key ('${key}') is invalid.`;
 
-		if (t.nil(reconcilliationValue))
-			throw 'Reconcilliation value must be defined when creating a new Warehouse.';
+		// When in Studio, the Warehouse will run in test mode, unless explicitly told otherwise.
+		runMode = t.nil(runMode) ? (RunService.IsStudio() ? RunMode.TEST : RunMode.LIVE) : runMode;
 
-		return new Warehouse<Template, Document>(key, reconcilliationValue);
+		const activeWarehouse = this.activeWarehouses.get(transformedKey);
+		if (activeWarehouse) return activeWarehouse;
+
+		return new Warehouse(key, template, runMode);
 	}
 
 	/**
-	 * Returns the value of a specified key.
-	 * If the key is not cached it will be fetched from the DataStore.
+	 * Gets the active document for the given key.
+	 * If the key is not cached it will be loaded from the store.
 	 *
-	 * @param key the key to get the value of.
-	 * @returns the value of the key.
+	 * __Important__:
+	 * If there is no template and no data in the store, the value will be undefined.
+	 * This means regardless of what type information says, this function
+	 * has the possibility of returning undefined.
+	 * If you intend on having your default value in the store be undefined, this is fine.
+	 * If not you should always check for undefined before using the value.
+	 *
+	 * @param rawKey The key to get the document for.
+	 * @returns The active document for the given key.
 	 */
-	public get(key: string) {
-		while (this.loadingKeys.has(key)) task.wait(0.1);
+	public get(rawKey: string | Player) {
+		const key = Warehouse.transformKey(rawKey);
+		if (!key) throw `The given key ('${rawKey}') is invalid.`;
 
-		const foundTemplate = this.data[key];
-		if (!t.nil(foundTemplate)) return foundTemplate;
+		// Debounce requests for keys that are already loading.
+		while (this.loadingKeys.has(key)) task.wait();
+
+		if (this.cache.has(key)) return this.cache.get(key) as ActiveDocument;
 
 		this.loadingKeys.add(key);
-
 		try {
-			let loadedDocument = this.load(key);
-			const { postLoad } = this.handlers;
-
-			let template: Template | undefined;
-			if (t.nil(loadedDocument)) template = this.reconcilliationValue;
-			else if (postLoad) template = postLoad(loadedDocument);
-			template = this.reconcile(template);
-
-			this.data[key] = template;
-			return { ...template };
+			// If the active document loaded is undefined, it means there is no template and no data in the store.
+			// This may mean that the user wants the default value to be undefined.
+			// The cast as ActiveDocument is to allow the value inside the cache to be undefined in case of this.
+			const activeDocument = this.load(key) as ActiveDocument;
+			this.cache.set(key, activeDocument);
+			return activeDocument;
 		} catch {
-			throw `Failed to load key ${key}!`;
+			throw `Error loading key ('${key}').`;
 		} finally {
 			this.loadingKeys.delete(key);
 		}
 	}
 
 	/**
-	 * Updates a key with a specified value.
-	 * If the value is a table it will be merged with the existing value,
-	 * otherwise the new value will overwrite the old one.
+	 * Sets the active document for the given key.
+	 * If the key does not exist, the key will be created.
+	 * This functions applies the {@link Warehouse.transformers}
+	 * and then the {@link Warehouse.guards}.
+	 * If the update went through, the {@link Warehouse.keyUpdateSignal} signal will be fired.
 	 *
-	 * Guards and transformers will be applied on any update to the value.
-	 *
-	 * @param key the key to update.
-	 * @param template the value to update the key with.
-	 * @param source the source of the update.
+	 * @param rawKey The key to set the document for.
+	 * @param document The active document to set.
+	 * @param source The source of the update.
 	 */
-	public update(key: string, template: Partial<Template>, source: UpdateSource = 'Server') {
-		const existingTemplate = this.get(key);
+	public set(rawKey: string | Player, document: ActiveDocument, source: UpdateSource = 'Server') {
+		const key = Warehouse.transformKey(rawKey);
+		if (!key) throw `The given key ('${rawKey}') is invalid.`;
 
-		if (t.table(existingTemplate) && t.table(template)) {
-			const newTemplate = Object.assign({ ...existingTemplate }, template);
-			if (Object.deepEquals(existingTemplate, newTemplate)) return;
+		const currentValue = this.get(key);
+		if (currentValue === document) return;
 
-			let transformedTemplate = newTemplate;
-			transformedTemplate = TransformerUtils.applyTransformations(this.globalTransformers, {
-				source,
-				oldValue: existingTemplate,
-				newValue: transformedTemplate,
-			});
+		let transformedValue = TransformerUtils.applyTransformations(this.transformers, {
+			oldValue: currentValue,
+			newValue: document,
+			source,
+		});
 
-			const boundTransformers = this.boundTransformers.get(key) || [];
-			transformedTemplate = TransformerUtils.applyTransformations(boundTransformers, {
-				source,
-				oldValue: existingTemplate,
-				newValue: transformedTemplate,
-			});
+		if (currentValue === transformedValue) return;
 
-			const guardInfo: UpdateInformation = {
-				source,
-				oldValue: existingTemplate,
-				newValue: transformedTemplate,
-			};
+		const guardsResult = GuardUtils.applyGuards(this.guards, {
+			oldValue: currentValue,
+			newValue: transformedValue,
+			source,
+		});
 
-			let isAllowed = true;
-			isAllowed = GuardUtils.applyGuards(this.globalGuards, guardInfo);
-			if (!isAllowed) return;
+		if (!guardsResult) return;
 
-			const boundGuards = this.boundGuards.get(key) || [];
-			isAllowed = GuardUtils.applyGuards(boundGuards, guardInfo);
-			if (!isAllowed) return;
-
-			this.set(key, newTemplate, existingTemplate);
-		}
-
-		if (!t.nil(template) && template !== existingTemplate) {
-			let transformedTemplate = template as Template;
-			transformedTemplate = TransformerUtils.applyTransformations(this.globalTransformers, {
-				source,
-				oldValue: existingTemplate,
-				newValue: transformedTemplate,
-			});
-
-			const isAllowed = GuardUtils.applyGuards(this.globalGuards, {
-				source,
-				oldValue: existingTemplate,
-				newValue: transformedTemplate,
-			});
-
-			if (!isAllowed) return;
-
-			this.set(key, transformedTemplate, existingTemplate);
-		}
+		this.cache.set(key, transformedValue);
+		this.keyUpdateSignal.Fire(key, transformedValue, currentValue);
 	}
 
 	/**
-	 * Sets a key with a specified value.
-	 * Calls the update handler if the value changed.
+	 * Loads a key from the store.
+	 * If the key is not found, the template will be used.
+	 * If the value is an encoded table, it will be decoded and merged with the template.
 	 *
-	 * @param key the key to set.
-	 * @param newTemplate the new value of the eky
-	 * @param oldTemplate the old value of the key.
+	 * @param key The key to load.
+	 * @returns The active document for the given key.
 	 */
-	private set(key: string, newTemplate: Template, oldTemplate: Template) {
-		this.data[key] = newTemplate;
-		const { onUpdate } = this.handlers;
-		onUpdate?.(key, this.get(key), oldTemplate);
+	protected load(key: string) {
+		const rawDormantDocument = this.store.GetAsync(key);
+
+		if (t.nil(rawDormantDocument)) return this.template;
+
+		let dormantDocument: DormantDocument | undefined;
+
+		// If it is a string, it could possibly be JSON.
+		if (t.string(rawDormantDocument)) {
+			const decodedDormantDocument = this.tryJsonDecode(rawDormantDocument);
+			if (t.nil(decodedDormantDocument)) return this.template;
+			else dormantDocument = decodedDormantDocument;
+		}
+
+		// If it was not JSON, just set it to the raw value.
+		if (t.nil(dormantDocument)) {
+			dormantDocument = rawDormantDocument as DormantDocument;
+		}
+
+		return this.transformDormantDocument(dormantDocument);
 	}
 
 	/**
-	 * Loads a key from the DataStore.
-	 * If the key is not found or invalid it will throw an error.
+	 * Deletes a key from the cache and saves the value in the store.
 	 *
-	 * @param key the key to load.
-	 * @returns the loaded value.
+	 * @param key The key to delete.
 	 */
-	private load(key: string) {
-		const document = this.dataStore.GetAsync(key);
+	public commit(rawKey: string | Player) {
+		const key = Warehouse.transformKey(rawKey);
+		if (!key) throw `The given key ('${rawKey}') is invalid.`;
+
+		if (this.commitingKeys.has(key)) return;
+		if (!this.cache.has(key)) return;
+
+		this.commitingKeys.add(key);
+		const activeDocument = this.cache.get(key) as ActiveDocument;
+		const dormantDocument = this.transformActiveDocument(activeDocument);
+
+		let encodedDocument: string | DormantDocument = dormantDocument;
+
+		const encoded = this.tryJsonEncode(dormantDocument);
+		if (!t.nil(encoded)) encodedDocument = encoded;
+
+		this.store.SetAsync(key, encodedDocument);
+
+		this.delete(key);
+		this.commitingKeys.delete(key);
+	}
+
+	/**
+	 * Deletes a key from the cache but does not commit it.
+	 * This is useful when there was an error in the loading process
+	 * and the data in the store should not be overwritten.
+	 *
+	 * @param rawKey The key to delete.
+	 */
+	public release(rawKey: string | Player) {
+		const key = Warehouse.transformKey(rawKey);
+		if (!key) throw `The given key ('${rawKey}') is invalid.`;
+		this.delete(key);
+	}
+
+	/**
+	 * Deletes a key from the internal cache.
+	 * To also commit the key, use {@link Warehouse.commit}.
+	 *
+	 * @param key The key to delete.
+	 */
+	protected delete(key: string) {
+		if (!this.cache.has(key)) return;
+		const value = this.cache.get(key)! as ActiveDocument;
+		this.cache.delete(key);
+		this.keyDeleteSignal.Fire(key, value);
+	}
+
+	/**
+	 * Attemps to decode a string as JSON.
+	 *
+	 * @param encodedData The raw JSON string to decode.
+	 * @returns The decoded JSON object, or undefined if the string is not valid JSON.
+	 */
+	protected tryJsonDecode(encodedData: string) {
 		try {
-			if (t.nil(document) || !t.string(document)) return undefined;
-			return HttpService.JSONDecode(document) as Document;
-		} catch {
-			throw `Failed to load key ${key}!`;
+			const decodedData = HttpService.JSONDecode(encodedData);
+			if (t.nil(decodedData)) return;
+			return decodedData as DormantDocument;
+		} catch {}
+	}
+
+	/**
+	 * Attempts to encode an object as JSON.
+	 *
+	 * @param decodedData The object to encode.
+	 * @returns The encoded JSON string, or undefined if the object cannot be encoded.
+	 */
+	protected tryJsonEncode(decodedData: any) {
+		if (!t.table(decodedData)) return;
+
+		try {
+			const encodedData = HttpService.JSONEncode(decodedData);
+			if (t.nil(encodedData)) return;
+			return encodedData as string;
+		} catch {}
+	}
+
+	/**
+	 * Transforms a dormant document into an active document.
+	 *
+	 * @param document The dormant document to transform.
+	 * @returns The active document.
+	 */
+	protected transformDormantDocument(document: DormantDocument) {
+		const transformedDocument = this.postLoadProcessor?.(document) ?? document;
+
+		if (t.table(this.template) && t.table(transformedDocument)) {
+			return { ...this.template, ...transformedDocument };
 		}
+
+		return transformedDocument as ActiveDocument;
 	}
 
 	/**
-	 * Commits a key to the DataStore.
-	 * This deletes the cached value from the warehouse.
+	 * Transforms an active document into a dormant document.
 	 *
-	 * @param key the key to commit.
+	 * @param document The active document to transform.
+	 * @returns The dormant document.
 	 */
-	public commit(key: string) {
-		const template = this.get(key);
-
-		const { preCommit } = this.handlers;
-		let document: Template | Document;
-		if (preCommit) document = preCommit(template);
-		else document = template;
-
-		const encodedDocument = HttpService.JSONEncode(document);
-		this.dataStore.SetAsync(key, encodedDocument);
-		delete this.data[key];
+	protected transformActiveDocument(document: ActiveDocument) {
+		const transformedDocument = this.preCommitProcessor?.(document) ?? document;
+		return transformedDocument as DormantDocument;
 	}
 
 	/**
-	 * Initiates a commit for every value inside the Warehouse's cache.
-	 */
-	private commitAll() {
-		const keys = Object.keys(this.data) as string[];
-		for (const key of keys) task.spawn(() => this.commit(key));
-	}
-
-	/**
-	 * Reconciles a value with the reconcilliation value.
-	 * If the value is a table, it will be merged,
-	 * otherwise, if it is nil, it will be replaced.
+	 * Attempts to transform the given key into a valid key.
 	 *
-	 * @param template The value to reconcile.
-	 * @returns the reconciled value.
+	 * @param rawKey The key to transform.
+	 * @returns The transformed key, or undefined if the key is invalid.
 	 */
-	private reconcile(template?: Template): Template {
-		if (t.table(template)) return Object.assign({}, this.reconcilliationValue, template);
-		else if (t.nil(template)) return this.reconcilliationValue;
-		else return template;
+	protected static transformKey(rawKey: string | Player) {
+		const key = t.string(rawKey) ? rawKey : tostring(rawKey.UserId);
+		if (!key) return;
+		const noSpacesKey = key.gsub('%s+', '')[0];
+		if (!noSpacesKey) return;
+		return noSpacesKey;
 	}
 
 	/**
-	 * Sets whether the warehouse should commit it's data when the game closes.
+	 * Returns the internal warehouse key.
 	 */
-	public setBoundToGame(boundToGame: boolean) {
-		this.boundToGame = boundToGame;
+	public getKey() {
+		return this.key;
 	}
 
 	/**
-	 * Updates the handlers within the warehouse.
-	 * This will merge given handlers with the existing ones.
+	 * Returns the internal datastore.
+	 * If not running in test mode, this will return nothing.
+	 */
+	public getStore() {
+		if (this.runMode === RunMode.TEST) return this.store;
+	}
+
+	/**
+	 * Returns the mode the warehouse is running in.
+	 */
+	public getRunMode() {
+		return this.runMode;
+	}
+
+	/**
+	 * Connects a handler to the key update signal and returns the connection.
+	 */
+	public onKeyUpdate(handler: KeyUpdateHandler<ActiveDocument>) {
+		return this.keyUpdateSignal.Connect(handler);
+	}
+
+	/**
+	 * Connects a handler to the key delete signal and returns the connection.
+	 */
+	public onKeyDelete(handler: KeyDeleteHandler<ActiveDocument>) {
+		return this.keyDeleteSignal.Connect(handler);
+	}
+
+	/**
+	 * Sets a proceessor that is called after the data is loaded from the store.
+	 * This can be useful for transforming the data before it is used, for things
+	 * like serialization.
+	 */
+	public setPostLoadProcessor(processor: PostLoadProcessor<ActiveDocument, DormantDocument>) {
+		this.postLoadProcessor = processor;
+	}
+
+	/**
+	 * Sets a proceessor that is called before the data is committed to the store.
+	 * This can be useful for transforming the data before it is saved, for things
+	 * like serialization.
+	 */
+	public setPreCommitProcessor(processor: PreCommitProcessor<ActiveDocument, DormantDocument>) {
+		this.preCommitProcessor = processor;
+	}
+
+	/**
+	 * Adds transformers to the warehouse.
+	 * These are used to transform updates before they are applied.
 	 *
-	 * @param handlers the handlers to update.
-	 */
-	public updateHandlers(handlers: Partial<WarehouseHandlers<Template, Document>>) {
-		this.handlers = { ...this.handlers, ...handlers };
-	}
-
-	/**
-	 * Adds global guards to the warehouse.
-	 *
-	 * @param guards the guards to add.
-	 */
-	public addGuards(...guards: Guard[]) {
-		const existingGuards = this.globalGuards;
-		const newGuards = [...existingGuards, ...guards];
-		this.globalGuards = newGuards;
-	}
-
-	/**
-	 * Adds global transformers to the warehouse.
-	 *
-	 * @param transformers the transformers to add.
+	 * @param transformers The transformers to add.
 	 */
 	public addTransformers(...transformers: Transformer[]) {
-		const existingTransformers = this.globalTransformers;
+		const existingTransformers = this.transformers;
 		const newTransformers = [...existingTransformers, ...transformers];
-		this.globalTransformers = newTransformers;
+		this.transformers = newTransformers;
 	}
 
 	/**
-	 * Adds guards bound to a key to the warehouse.
-	 * If the internal value is not a table, these guards will never be applied.
+	 * Adds guards to the warehouse.
+	 * These are used to validate updates before they are applied.
 	 *
-	 * @param key the key to bind the guards to.
-	 * @param guards the guards to bind.
+	 * @param guards The guards to add.
 	 */
-	public addBoundGuards(key: StringKeyof<Template>, ...guards: Guard[]) {
-		const existingGuards = this.boundGuards.get(key) || [];
+	public addGuards(...guards: Guard[]) {
+		const existingGuards = this.guards;
 		const newGuards = [...existingGuards, ...guards];
-		this.boundGuards.set(key, newGuards);
-	}
-
-	/**
-	 * Adds transformers bound to a key to the warehouse.
-	 * If the internal value is not a table, these transformers will never be applied.
-	 *
-	 * @param key the key to bind the transformers to.
-	 * @param transformers the transformers to bind.
-	 */
-	public addBoundTransformers(key: StringKeyof<Template>, ...transformers: Transformer[]) {
-		const existingTransformers = this.boundTransformers.get(key) || [];
-		const newTransformers = [...existingTransformers, ...transformers];
-		this.boundTransformers.set(key, newTransformers);
+		this.guards = newGuards;
 	}
 }
