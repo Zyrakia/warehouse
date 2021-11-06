@@ -58,7 +58,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	 * @param template The template of the warehouse.
 	 * @param runMode The run mode of the warehouse.
 	 */
-	private constructor(key: string, template: ActiveDocument | undefined, runMode: RunMode) {
+	protected constructor(key: string, template: ActiveDocument | undefined, runMode: RunMode) {
 		this.key = key;
 		this.runMode = runMode;
 		this.template = template;
