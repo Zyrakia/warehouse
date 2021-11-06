@@ -13,7 +13,7 @@ export = () => {
 		expect(warehouse.getOrdered().size()).to.be.ok();
 	});
 
-	it('gets ordered entries in descending order', () => {
+	it('can get ordered entries in descending order', () => {
 		warehouse.loadOrdered();
 		const ordered = warehouse.getOrdered(SortOrder.DESCENDING);
 		expect(ordered[0][0]).to.equal('Mockeri');
@@ -21,7 +21,7 @@ export = () => {
 		expect(ordered[2][0]).to.equal('AlexAstral');
 	});
 
-	it('gets ordered entries in ascending order', () => {
+	it('can get ordered entries in ascending order', () => {
 		warehouse.loadOrdered();
 		const ordered = warehouse.getOrdered(SortOrder.ASCENDING);
 		expect(ordered[0][0]).to.equal('AlexAstral');
@@ -29,7 +29,7 @@ export = () => {
 		expect(ordered[2][0]).to.equal('Mockeri');
 	});
 
-	it('can increment keys by random amount', () => {
+	it('can increment keys by a variable amount', () => {
 		warehouse.increment('Zyrakia', 10);
 		warehouse.increment('Mockeri', 213);
 		warehouse.increment('AlexAstral', 1543);
@@ -38,7 +38,7 @@ export = () => {
 		expect(warehouse.get('AlexAstral')).to.equal(1553);
 	});
 
-	it('can decrement keys by random amount', () => {
+	it('can decrement keys by a variable amount', () => {
 		warehouse.decrement('Zyrakia', 10);
 		warehouse.decrement('Mockeri', 213);
 		warehouse.decrement('AlexAstral', 1543);
