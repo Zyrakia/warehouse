@@ -1,4 +1,4 @@
-import { Guard } from 'index';
+import { Guard } from '../Guard';
 
 /** A guard that never passes. */
 export class ReadonlyGuard implements Guard {

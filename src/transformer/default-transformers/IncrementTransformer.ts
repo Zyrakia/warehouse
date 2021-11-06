@@ -1,6 +1,6 @@
 import { t } from '@rbxts/t';
-import { Transformer } from 'index';
-import { UpdateInformation } from 'types/UpdateInformation';
+import { Transformer } from '../Transformer';
+import { UpdateInformation } from '../../types/UpdateInformation';
 
 /** A transformer that ensures that the value increment / decrement is not more than the specified limits. */
 export class IncrementTransformer implements Transformer {

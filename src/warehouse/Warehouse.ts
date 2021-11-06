@@ -1,9 +1,11 @@
 import { DataStoreService, HttpService, RunService } from '@rbxts/services';
 import { t } from '@rbxts/t';
 import * as MOCK from '@rbxts/mockdatastoreservice';
-import { RunMode } from 'types/RunMode';
+import { RunMode } from '../types/RunMode';
 import Signal from '@rbxts/signal';
-import { Guard, GuardUtils, Transformer, TransformerUtils, UpdateSource } from 'index';
+import { Guard, GuardUtils } from '../guard/Guard';
+import { Transformer, TransformerUtils } from '../transformer/Transformer';
+import { UpdateSource } from '../types/UpdateSource';
 
 export type KeyUpdateHandler<ActiveDocument = any> = (
 	key: string,
@@ -94,7 +96,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 		const activeWarehouse = this.activeWarehouses.get(transformedKey);
 		if (activeWarehouse) return activeWarehouse;
 
-		return new Warehouse(key, template, runMode);
+		return new Warehouse(transformedKey, template, runMode);
 	}
 
 	/**
@@ -189,11 +191,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 		let dormantDocument: DormantDocument | undefined;
 
 		// If it is a string, it could possibly be JSON.
-		if (t.string(rawDormantDocument)) {
-			const decodedDormantDocument = this.tryJsonDecode(rawDormantDocument);
-			if (t.nil(decodedDormantDocument)) return this.template;
-			else dormantDocument = decodedDormantDocument;
-		}
+		if (t.string(rawDormantDocument)) dormantDocument = this.tryJsonDecode(rawDormantDocument);
 
 		// If it was not JSON, just set it to the raw value.
 		if (t.nil(dormantDocument)) {
@@ -260,7 +258,7 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	 * Attemps to decode a string as JSON.
 	 *
 	 * @param encodedData The raw JSON string to decode.
-	 * @returns The decoded JSON object, or undefined if the string is not valid JSON.
+	 * @returns The decoded JSON table, or undefined if the string is not valid JSON.
 	 */
 	protected tryJsonDecode(encodedData: string) {
 		try {
@@ -271,10 +269,10 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	}
 
 	/**
-	 * Attempts to encode an object as JSON.
+	 * Attempts to encode an table as JSON.
 	 *
-	 * @param decodedData The object to encode.
-	 * @returns The encoded JSON string, or undefined if the object cannot be encoded.
+	 * @param decodedData The table to encode.
+	 * @returns The encoded JSON string, or undefined if the table cannot be encoded.
 	 */
 	protected tryJsonEncode(decodedData: any) {
 		if (!t.table(decodedData)) return;
@@ -322,9 +320,9 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	protected static transformKey(rawKey: string | Player) {
 		const key = t.string(rawKey) ? rawKey : tostring(rawKey.UserId);
 		if (!key) return;
-		const noSpacesKey = key.gsub('%s+', '')[0];
-		if (!noSpacesKey) return;
-		return noSpacesKey;
+		const [result, _] = string.gsub(key, '%s+', '');
+		if (!result) return;
+		return result;
 	}
 
 	/**
@@ -364,18 +362,21 @@ export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
 	}
 
 	/**
-	 * Sets a proceessor that is called after the data is loaded from the store.
-	 * This can be useful for transforming the data before it is used, for things
-	 * like serialization.
+	 * Sets a processor that is called after the data is loaded from the store.
+	 * This can be useful to transform the data before it is used, to apply
+	 * things like serializtion.
+	 *
+	 * This will **NOT** be called when there is no data in the store for the key,
+	 * in this case the value will always be the template, and the processor is not needed.
 	 */
 	public setPostLoadProcessor(processor: PostLoadProcessor<ActiveDocument, DormantDocument>) {
 		this.postLoadProcessor = processor;
 	}
 
 	/**
-	 * Sets a proceessor that is called before the data is committed to the store.
-	 * This can be useful for transforming the data before it is saved, for things
-	 * like serialization.
+	 * Sets a processor that is called before the data is committed to the store.
+	 * This can be useful to transform the data before it is saved, to apply
+	 * things like serialization.
 	 */
 	public setPreCommitProcessor(processor: PreCommitProcessor<ActiveDocument, DormantDocument>) {
 		this.preCommitProcessor = processor;

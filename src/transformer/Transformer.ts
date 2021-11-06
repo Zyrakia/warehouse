@@ -1,4 +1,4 @@
-import { UpdateInformation } from 'types/UpdateInformation';
+import { UpdateInformation } from '../types/UpdateInformation';
 
 /**
  * The base interface for all update transformers.

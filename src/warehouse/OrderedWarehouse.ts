@@ -1,12 +1,12 @@
 import Object from '@rbxts/object-utils';
 import { DataStoreService, RunService } from '@rbxts/services';
 import { t } from '@rbxts/t';
-import { Guard, GuardUtils } from 'guard/Guard';
-import { UpdateSource } from 'index';
-import { Transformer, TransformerUtils } from 'transformer/Transformer';
-import { SortOrder } from 'types/SortOrder';
-import { StringObject } from 'types/StringObject';
-import { OrderedWarehouseHandlers } from 'types/WarehouseHandlers';
+import { Guard, GuardUtils } from '../guard/Guard';
+import { UpdateSource } from '../types/UpdateSource';
+import { Transformer, TransformerUtils } from '../transformer/Transformer';
+import { SortOrder } from '../types/SortOrder';
+import { StringObject } from '../types/StringObject';
+import { OrderedWarehouseHandlers } from '../types/WarehouseHandlers';
 
 export class OrderedWarehouse {
 	private static warehouses = new Map<string, OrderedWarehouse>();
