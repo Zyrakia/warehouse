@@ -34,7 +34,7 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 		this.store = store;
 
 		this.keyUpdateSignal.Connect((key, value) => {
-			this.reconcilliateOrderedCache(key, value);
+			this.reconciliateOrderedCache(key, value);
 		});
 	}
 
@@ -94,16 +94,19 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 	}
 
 	/**
-	 * Loads a specified amount of entriees from the store into the ordered cache.
+	 * Loads a specified amount of entries from the store into the ordered cache.
 	 * This will clear the current cache completely.
 	 * If this loads a key that is found in the regular cache,
 	 * it is always preferred over the loaded value.
 	 *
 	 * @see {@link OrderedWarehouse.getOrdered}
 	 *
-	 * @param amount The amount of entries to load.
+	 * @param amount The amount of entries to load. (0 - 100, default: 50)
 	 */
 	public loadOrdered(amount = 50) {
+		if (!t.numberConstrained(0, 100)(amount))
+			throw `The amount of entries to load must be between 0 and 100.`;
+
 		this.orderedCache.clear();
 		const page = this.store.GetSortedAsync(false, amount).GetCurrentPage();
 
@@ -119,7 +122,7 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 		this.orderedCacheUpdatedSignal.Fire();
 	}
 
-	private reconcilliateOrderedCache(key: string, value: number) {
+	private reconciliateOrderedCache(key: string, value: number) {
 		const previousValue = this.orderedCache.get(key);
 		if (!previousValue || previousValue === value) return;
 		this.orderedCache.set(key, value);
@@ -129,7 +132,7 @@ export class OrderedWarehouse extends Warehouse<number, number> {
 	/**
 	 * Connects a handler to the ordered cache loaded signal and returns the connection.
 	 */
-	public onOrderedCacheUpdateed(handler: OrderedCacheUpdatedHandler) {
+	public onOrderedCacheUpdated(handler: OrderedCacheUpdatedHandler) {
 		return this.orderedCacheUpdatedSignal.Connect(handler);
 	}
 }
