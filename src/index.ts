@@ -16,3 +16,4 @@ export { UpdateSource } from './types/UpdateSource';
 
 export { Warehouse } from './warehouse/Warehouse';
 export { OrderedWarehouse } from './warehouse/OrderedWarehouse';
+export { WarehouseFactory } from './warehouse/WarehouseFactory';
