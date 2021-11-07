@@ -1,7 +1,7 @@
 {
     "name": "@rbxts/warehouse",
     "description": "A Roblox DataStore abstraction library.",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "main": "build/init.lua",
     "license": "MIT",
     "scripts": {
