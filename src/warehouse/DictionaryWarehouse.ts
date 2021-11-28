@@ -78,7 +78,7 @@ export class DictionaryWarehouse<A extends Dict, D extends Dict = A> extends War
 				source,
 			});
 
-			if (transformedValue === oldValue) continue;
+			if (transformedValue as unknown === oldValue as unknown) continue;
 
 			const guards = this.dictKeyGuards.get(key) || [];
 			const guardsResult = GuardUtils.applyGuards(guards, {
