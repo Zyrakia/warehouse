@@ -19,15 +19,25 @@
   resolved "https://registry.yarnpkg.com/@rbxts/object-utils/-/object-utils-1.0.4.tgz#c53d80f89e75c401365446be63fa1396bc2cffe7"
   integrity sha512-dLLhf022ipV+9i910sOE7kl9losKHoon0WgeerHqVMQA5EYsLUsVT2AxhJuhk8MiDn5oJ2GiFofE/LadY9TpJQ==
 
+"@rbxts/ping@^2.2.2":
+  version "2.2.2"
+  resolved "https://registry.yarnpkg.com/@rbxts/ping/-/ping-2.2.2.tgz#9d99615c2e6dff53276ddbd8360ef34662b64509"
+  integrity sha512-LtPVWAaJ0g2pVQwEsspnlaMIhAh84tIXh9DKV039n+Z2KUae0KF3f1wHwRCTa/kLSDuM31X2WU5EyFUxATVhBQ==
+
+"@rbxts/rust-classes@^0.11.0-beta.1":
+  version "0.11.0-beta.1"
+  resolved "https://registry.yarnpkg.com/@rbxts/rust-classes/-/rust-classes-0.11.0-beta.1.tgz#6fb82c3f02950104030615b0bcc5c73b6e39566c"
+  integrity sha512-lZiXBIohK3fg3ImqQ0P+lRNp9EKeSXK4kA3yVf5Tc5bwQVyS6/O5XvlUeh4s7wRYcure+fd8s0qISQ7DP5Gw0Q==
+
 "@rbxts/services@^1.2.0":
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/@rbxts/services/-/services-1.2.0.tgz#5dcc980fc937d5634dab31f8e564f6565d78ea47"
   integrity sha512-GEnAGgRz/oFEfBCjr+UChO7D49c/l+Wgr2OHMkURBKbVAqGg7hVQbEs9PUr+9BuVx/8OlsqZ/cvrUYbwAyd60A==
 
-"@rbxts/signal@^1.0.3":
+"@rbxts/string-utils@^1.0.3":
   version "1.0.3"
-  resolved "https://registry.yarnpkg.com/@rbxts/signal/-/signal-1.0.3.tgz#7663caf4f6350475488c3a1d5bb4cbc67fe6d0f4"
-  integrity sha512-faFH5kVkQotZ2YzJhQ7Z12T9YkfV1O6y0V0V/I/RknBVAmefuIM8pSWj2AIEecOR6jSCtg0yZS8gNYKwfoopNA==
+  resolved "https://registry.yarnpkg.com/@rbxts/string-utils/-/string-utils-1.0.3.tgz#109c5a18d059447005fdf6fae40aa13cf452d91b"
+  integrity sha512-nsZsPdGsrsBdwLg7qQ5RGHoVhfvK+U3GvZ/6S+7KufqaFrbHWk2lufESob/C3xYf5sAeXgTJKWUnDJknYBGTIQ==
 
 "@rbxts/t@^2.2.1":
   version "2.2.1"

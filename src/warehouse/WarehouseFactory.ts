@@ -1,59 +1,117 @@
-import * as MOCK from '@rbxts/mockdatastoreservice';
-import { DataStoreService } from '@rbxts/services';
-
+import * as MOCk from '@rbxts/mockdatastoreservice';
+import { DataStoreService, RunService } from '@rbxts/services';
+import { t } from '@rbxts/t';
+import { NameValidator } from '../safety/NameValidator';
+import { Log } from '../util/Log';
 import { RunMode } from '../types/RunMode';
-import { OrderedWarehouse } from './OrderedWarehouse';
 import { Warehouse } from './Warehouse';
+import { WarehouseHolder } from './WarehouseHolder';
+import { OrderedWarehouse } from './OrderedWarehouse';
+import { Dictionary, Error } from 'index';
+import { DictionaryWarehouse } from './DictionaryWarehouse';
 
 export namespace WarehouseFactory {
 	/**
-	 * Initializes a warehouse, creating a new one if one does not exist.
-	 * The template and runMode parameters will only be used when a warehouse does not exist.
+	 * Creates or obtains a warehouse.
 	 *
-	 * @param key The key of the warehouse.
-	 * @param template The template of the warehouse, used to reconciliate any missing data.
-	 * @param runMode The run mode of the warehouse, in development mode, no actual Roblox DataStore will be used.
+	 * @param name The name of the warehouse, must be unique.
+	 * @param template The template of the warehouse, can be omitted if obtaining an existing warehouse.
+	 * @param runMode The run mode of the warehouse. See {@link RunMode}. Defaults to {@link RunMode.DEV} in Studio.
+	 *
+	 * @returns The created warehouse or the existing warehouse.
 	 */
-	export function init<ActiveDocument = any, DormantDocument = ActiveDocument>(
-		key: string,
-		template?: ActiveDocument,
+	export function init<A = any, D = A>(
+		name: string,
+		template?: A,
 		runMode?: RunMode,
-	): Warehouse<ActiveDocument, DormantDocument> {
-		const transformedKey = Warehouse.transformKey(key);
-		if (!transformedKey) throw `The given warehouse key ('${key}') is invalid.`;
+	): Warehouse<A, D> {
+		const parsedName = new NameValidator(name).asWarehouseName();
 
-		const activeWarehouse = Warehouse.getActiveWarehouse(transformedKey);
+		const activeWarehouse = WarehouseHolder.resolveWarehouse(parsedName);
 		if (activeWarehouse) return activeWarehouse;
 
-		runMode = Warehouse.decideRunMode(runMode);
-		const store =
-			runMode === RunMode.DEV ? MOCK.GetDataStore(key) : DataStoreService.GetDataStore(key);
+		runMode = decideRunMode(runMode);
+		Log.info(`Creating new warehouse ${parsedName} in mode: ${runMode}.`);
 
-		return new Warehouse(transformedKey, template, runMode, store);
+		const store =
+			runMode === RunMode.DEV
+				? MOCk.GetDataStore(parsedName)
+				: DataStoreService.GetDataStore(parsedName);
+
+		return new Warehouse(parsedName, template, store, runMode);
 	}
 
 	/**
-	 * Initializes a new ordered warehouse, creating a new one if one does not exist.
-	 * The template and runMode parameters will only be used when a warehouse does not exist.
-	 * The template defaults to 0 if omitted.
+	 * Creates or obtains an ordered warehouse.
 	 *
-	 * @param key The key of the warehouse.
-	 * @param template The template of the warehouse, used to reconciliate any missing key.
-	 * @param runMode The run mode of the warehouse, in development mode, no actual Roblox DataStore will be used.
+	 * @param name The name of the warehouse, must be unique.
+	 * @param template The template of the warehouse, can be omitted if obtaining an existing warehouse. Defaults to 0.
+	 * @param runMode The run mode of the warehouse. See {@link RunMode}. Defaults to {@link RunMode.DEV} in Studio.
+	 *
+	 * @returns The created warehouse or the existing warehouse.
 	 */
-	export function initOrdered(key: string, template = 0, runMode?: RunMode): OrderedWarehouse {
-		const transformedKey = Warehouse.transformKey(key);
-		if (!transformedKey) throw `The given warehouse key ('${key}') is invalid.`;
+	export function initOrdered(name: string, template = 0, runMode?: RunMode) {
+		const parsedName = new NameValidator(name).asWarehouseName();
 
-		const activeWarehouse = Warehouse.getActiveWarehouse(transformedKey);
-		if (activeWarehouse && activeWarehouse instanceof OrderedWarehouse) return activeWarehouse;
+		const activeWarehouse = WarehouseHolder.resolveWarehouse(parsedName);
+		if (activeWarehouse) {
+			if (activeWarehouse instanceof OrderedWarehouse) return activeWarehouse;
 
-		runMode = Warehouse.decideRunMode(runMode);
+			throw new Error(
+				'WarehouseTypeMismatchError',
+				`Warehouse ${parsedName} exists, but is not an OrderedWarehouse.`,
+			);
+		}
+
+		runMode = decideRunMode(runMode);
+		Log.info(`Creating new ordered warehouse ${parsedName} in mode: ${runMode}.`);
+
 		const store =
 			runMode === RunMode.DEV
-				? MOCK.GetOrderedDataStore(transformedKey)
-				: DataStoreService.GetOrderedDataStore(transformedKey);
+				? MOCk.GetOrderedDataStore(parsedName)
+				: DataStoreService.GetOrderedDataStore(parsedName);
 
-		return new OrderedWarehouse(transformedKey, template, runMode, store);
+		return new OrderedWarehouse(parsedName, template, store, runMode);
+	}
+
+	/**
+	 * Creates or obtains a dictionary warehouse.
+	 *
+	 * @param name The name of the warehouse, must be unique.
+	 * @param template The template of the warehouse, can be omitted if obtaining an existing warehouse.
+	 * @param runMode The run mode of the warehouse. See {@link RunMode}. Defaults to {@link RunMode.DEV} in Studio.
+	 *
+	 * @returns The created warehouse or the existing warehouse.
+	 */
+	export function initDict<A extends Dictionary, B extends Dictionary = A>(
+		name: string,
+		template?: A,
+		runMode?: RunMode,
+	): DictionaryWarehouse<A, B> {
+		const parsedName = new NameValidator(name).asWarehouseName();
+
+		const activeWarehouse = WarehouseHolder.resolveWarehouse(parsedName);
+		if (activeWarehouse) {
+			if (activeWarehouse instanceof DictionaryWarehouse) return activeWarehouse;
+
+			throw new Error(
+				'WarehouseTypeMismatchError',
+				`Warehouse ${parsedName} exists, but is not a DictionaryWarehouse.`,
+			);
+		}
+
+		runMode = decideRunMode(runMode);
+		Log.info(`Creating new dictionary warehouse ${parsedName} in mode: ${runMode}.`);
+
+		const store =
+			runMode === RunMode.DEV
+				? MOCk.GetDataStore(parsedName)
+				: DataStoreService.GetDataStore(parsedName);
+
+		return new DictionaryWarehouse(parsedName, template, store, runMode);
+	}
+
+	function decideRunMode(runMode?: RunMode) {
+		return t.nil(runMode) ? (RunService.IsStudio() ? RunMode.DEV : RunMode.PROD) : runMode;
 	}
 }

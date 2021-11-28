@@ -43,6 +43,7 @@ export namespace TransformerUtils {
 
 		for (const transformer of transformers) {
 			transformedValue = transformer.transform({
+				key: info.key,
 				source: info.source,
 				oldValue: info.oldValue,
 				newValue: transformedValue,

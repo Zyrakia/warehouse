@@ -1,432 +1,313 @@
-import { HttpService, RunService } from '@rbxts/services';
-import Signal from '@rbxts/signal';
 import { t } from '@rbxts/t';
-
 import { Guard, GuardUtils } from '../guard/Guard';
+import { ProcessorApplier } from '../processor/ProcessorApplier';
 import { Transformer, TransformerUtils } from '../transformer/Transformer';
+import { Key } from '../types/Key';
+import { JSON } from '../util/JSON';
+import { Processor } from '../processor/Processor';
 import { RunMode } from '../types/RunMode';
 import { UpdateSource } from '../types/UpdateSource';
-
-export type KeyUpdateHandler<ActiveDocument = any> = (
-	key: string,
-	newDocument: ActiveDocument,
-	oldDocument: ActiveDocument,
-) => void;
-
-export type KeyDeleteHandler<ActiveDocument = any> = (
-	key: string,
-	deletedDocument: ActiveDocument,
-) => void;
-
-export type PostLoadProcessor<ActiveDocument = any, DormantDocument = ActiveDocument> = (
-	document: DormantDocument,
-) => ActiveDocument;
-
-export type PreCommitProcessor<ActiveDocument = any, DormantDocument = ActiveDocument> = (
-	document: ActiveDocument,
-) => DormantDocument;
+import { Ping } from '@rbxts/ping';
+import { KeyValidator } from '../safety/KeyValidator';
+import { NameValidator } from '../safety/NameValidator';
+import { DataStorePerformer } from '../performer/DataStorePerformer';
 
 /**
- * A Roblox GlobalDataStore wrapper which focuses on ease of use.
+ * The base class for all warehouses, and also
+ * the implementation of all basic get/set operations.
+ *
+ * This class takes care of:
+ * - Loading and comitting documents.
+ * - Holding documents in cache.
+ * - Basic get and set operations on any document type.
+ * - Managing global transformers and guards.
+ * - Managing the updated and deleted signals.
  */
-export class Warehouse<ActiveDocument = any, DormantDocument = ActiveDocument> {
-	protected static readonly activeWarehouses: Map<string, Warehouse> = new Map();
+export class Warehouse<A = any, D = A, DataStoreType extends GlobalDataStore = GlobalDataStore> {
+	private name: string;
 
-	protected key;
-	protected runMode;
-	protected store;
-	protected template?;
+	private processor: Processor<A, D>;
+	private applier: ProcessorApplier<A, D>;
+	private performer: DataStorePerformer;
 
-	protected keyUpdateSignal = new Signal<KeyUpdateHandler<ActiveDocument>>();
-	protected keyDeleteSignal = new Signal<
-		(key: string, deletedDocument: ActiveDocument) => void
-	>();
+	private transformers: Transformer[] = [];
+	private guards: Guard[] = [];
 
-	protected postLoadProcessor?: PostLoadProcessor<ActiveDocument, DormantDocument>;
-	protected preCommitProcessor?: PreCommitProcessor<ActiveDocument, DormantDocument>;
+	private loadingKeys = new Set<string>();
+	private committingKeys = new Set<string>();
 
-	protected cache = new Map<string, ActiveDocument>();
-	protected loadingKeys = new Set<string>();
-	protected committingKeys = new Set<string>();
+	public cache = new Map<string, A>();
 
-	protected transformers: Transformer[] = [];
-	protected guards: Guard[] = [];
+	private deletedPing = new Ping<(key: Key, deletedDocument: A) => void>();
+	public readonly onKeyDeleted = this.deletedPing.connector;
+
+	private updatedPing = new Ping<(key: Key, newDocument: A, oldDocument: A) => void>();
+	public readonly onKeyUpdated = this.updatedPing.connector;
 
 	/**
-	 * Constructs a new warehouse and registers it with the active warehouses.
-	 * This should **NOT** be called directly, use the {@link WarehouseFactory} instead.
+	 * Constructs a new warehouse.
+	 * Warehouses should not be created with this constructor,
+	 * rather they should be created using the WarehouseFactory.
 	 *
-	 * @param rawKey The key of the warehouse.
+	 * @param name The name of the warehouse.
 	 * @param template The template of the warehouse.
-	 * @param runMode The run mode of the warehouse.
+	 * @param store The GlobalDataStore to use.
+	 * @param runMode The run mode of the warehouse See {@link RunMode}.
 	 */
 	public constructor(
-		rawKey: string,
-		template: ActiveDocument | undefined,
-		runMode: RunMode,
-		store: GlobalDataStore,
+		name: string,
+		protected template: A | undefined,
+		protected store: DataStoreType,
+		private runMode: RunMode,
 	) {
-		const key = Warehouse.transformKey(rawKey);
-		if (!key) throw `The given warehouse key ('${rawKey}') is invalid.`;
+		const parsedName = new NameValidator(name).asWarehouseName();
 
-		this.key = key;
-		this.template = template;
-		this.runMode = runMode;
-		this.store = store;
-
-		if (Warehouse.activeWarehouses.get(rawKey))
-			throw `A warehouse with the key '${rawKey}' already exists.`;
-
-		Warehouse.activeWarehouses.set(rawKey, this);
+		this.name = parsedName;
+		this.processor = new Processor<A, D>();
+		this.applier = new ProcessorApplier<A, D>(this.template, this.processor);
+		this.performer = new DataStorePerformer(this.store);
 	}
 
 	/**
-	 * Gets the active warehouse for the given key.
+	 * Gets the value associated with the given key.
+	 * If the key is not cached, it will be loaded from the store.
 	 *
-	 * @param key The key of the warehouse.
+	 * @param key The key to get the value of.
+	 * @returns The value associated with the given key.
 	 */
-	public static getActiveWarehouse(key: string) {
-		return Warehouse.activeWarehouses.get(key);
+	public get(key: Key): A {
+		const parsedKey = new KeyValidator(key).asValueKey();
+
+		while (this.loadingKeys.has(parsedKey)) task.wait();
+		if (this.cache.has(parsedKey)) return this.cache.get(parsedKey) as A;
+
+		this.loadingKeys.add(parsedKey);
+
+		const loadedDocument = this.load(key);
+		this.cache.set(parsedKey, loadedDocument);
+
+		this.loadingKeys.delete(parsedKey);
+		return loadedDocument;
 	}
 
 	/**
-	 * Gets the active document for the given key.
-	 * If the key is not cached it will be loaded from the store.
+	 * Sets the document associated with the given key.
+	 * If the key is not cached, it will be loaded from the store.
+	 * This operation is subject to global transformers and guards.
 	 *
-	 * __Important__:
-	 * If there is no template and no data in the store, the value will be undefined.
-	 * This means regardless of what type information says, this function
-	 * has the possibility of returning undefined.
-	 * If you intend on having your default value in the store be undefined, this is fine.
-	 * If not you should always check for undefined before using the value.
-	 *
-	 * @param rawKey The key to get the document for.
-	 * @returns The active document for the given key.
-	 */
-	public get(rawKey: string | Player) {
-		const key = Warehouse.transformKey(rawKey);
-		if (!key) throw `The given key ('${rawKey}') is invalid.`;
-
-		// Debounce requests for keys that are already loading.
-		while (this.loadingKeys.has(key)) task.wait();
-
-		if (this.cache.has(key)) return this.cache.get(key) as ActiveDocument;
-
-		this.loadingKeys.add(key);
-		try {
-			// If the active document loaded is undefined, it means there is no template and no data in the store.
-			// This may mean that the user wants the default value to be undefined.
-			// The cast as ActiveDocument is to allow the value inside the cache to be undefined in case of this.
-			const activeDocument = this.load(key) as ActiveDocument;
-			this.cache.set(key, activeDocument);
-			return activeDocument;
-		} catch {
-			throw `Error loading key ('${key}').`;
-		} finally {
-			this.loadingKeys.delete(key);
-		}
-	}
-
-	/**
-	 * Sets the active document for the given key.
-	 * If the key does not exist, the key will be created.
-	 * This functions applies the {@link Warehouse.transformers}
-	 * and then the {@link Warehouse.guards}.
-	 * If the update went through, the {@link Warehouse.keyUpdateSignal} signal will be fired.
-	 *
-	 * @param rawKey The key to set the document for.
-	 * @param document The active document to set.
+	 * @param key The key to set the value of.
+	 * @param document The document to set.
 	 * @param source The source of the update.
 	 */
-	public set(rawKey: string | Player, document: ActiveDocument, source: UpdateSource = 'Server') {
-		const key = Warehouse.transformKey(rawKey);
-		if (!key) throw `The given key ('${rawKey}') is invalid.`;
+	public set(key: Key, document: A, source: UpdateSource = 'Server') {
+		const parsedKey = new KeyValidator(key).asValueKey();
 
-		const currentValue = this.get(key);
-		if (currentValue === document) return;
+		const currentDocument = this.get(parsedKey);
+		if (document === currentDocument) return this;
 
-		let transformedValue = TransformerUtils.applyTransformations(this.transformers, {
-			oldValue: currentValue,
+		const transformedDocument = TransformerUtils.applyTransformations(this.transformers, {
+			key: key,
+			oldValue: currentDocument,
 			newValue: document,
 			source,
 		});
 
-		if (currentValue === transformedValue) return;
+		if (transformedDocument === currentDocument) return this;
 
 		const guardsResult = GuardUtils.applyGuards(this.guards, {
-			oldValue: currentValue,
-			newValue: transformedValue,
+			key: key,
+			oldValue: currentDocument,
+			newValue: transformedDocument,
 			source,
 		});
 
-		if (!guardsResult) return;
+		if (guardsResult) return this;
 
-		this.cache.set(key, transformedValue);
-		this.keyUpdateSignal.Fire(key, transformedValue, currentValue);
+		this.cache.set(parsedKey, transformedDocument);
+		this.updatedPing.fire(key, transformedDocument, currentDocument);
+		return this;
 	}
 
 	/**
-	 * Loads a key from the store.
-	 * If the key is not found, the template will be used.
-	 * If the value is an encoded table, it will be decoded and merged with the template.
+	 * Loads the document from the store and caches it.
+	 * This does not return the document, for that, use {@link get}.
 	 *
 	 * @param key The key to load.
-	 * @returns The active document for the given key.
 	 */
-	protected load(key: string) {
-		const rawDormantDocument = this.store.GetAsync(key);
+	public preload(key: Key) {
+		const parsedKey = new KeyValidator(key).asValueKey();
 
-		if (t.nil(rawDormantDocument)) return this.template;
+		if (this.loadingKeys.has(parsedKey) || this.cache.has(parsedKey)) return this;
 
-		let dormantDocument: DormantDocument | undefined;
+		this.loadingKeys.add(parsedKey);
+		const document = this.load(key);
+		this.cache.set(parsedKey, document);
+		this.loadingKeys.delete(parsedKey);
+		return this;
+	}
 
-		// If it is a string, it could possibly be JSON.
-		if (t.string(rawDormantDocument)) dormantDocument = this.tryJsonDecode(rawDormantDocument);
+	/**
+	 * Loads the document from the store and processes it.
+	 *
+	 * @param key The key to load.
+	 * @returns The loaded document.
+	 */
+	private load(key: Key) {
+		const parsedKey = new KeyValidator(key).asValueKey();
 
-		// If it was not JSON, just set it to the raw value.
-		if (t.nil(dormantDocument)) {
-			dormantDocument = rawDormantDocument as DormantDocument;
+		let rawDormantDocument;
+		try {
+			rawDormantDocument = this.performer.performGet(parsedKey);
+		} catch (e) {
+			throw e;
+		} finally {
+			this.loadingKeys.delete(parsedKey);
 		}
 
-		return this.transformDormantDocument(dormantDocument);
+		let dormantDocument;
+		if (t.string(rawDormantDocument)) dormantDocument = JSON.parse(rawDormantDocument) as D;
+		if (t.nil(dormantDocument)) dormantDocument = rawDormantDocument as D;
+
+		return this.applier.applyLoad(key, dormantDocument);
 	}
 
 	/**
-	 * Saves the value to the store, and may delete the value from the cache.
+	 * Commits the document associated with the given key to the store.
 	 *
 	 * @param key The key to commit.
-	 * @param soft If true, the value will not be deleted from the cache.
+	 * @param soft If true, the document will not be deleted from the cache.
 	 */
-	public commit(rawKey: string | Player, soft = false) {
-		const key = Warehouse.transformKey(rawKey);
-		if (!key) throw `The given key ('${rawKey}') is invalid.`;
+	public commit(key: Key, soft = false) {
+		const parsedKey = new KeyValidator(key).asValueKey();
 
-		if (this.committingKeys.has(key)) return;
-		if (!this.cache.has(key)) return;
+		if (this.committingKeys.has(parsedKey)) return this;
+		if (!this.cache.has(parsedKey)) return this;
 
-		this.committingKeys.add(key);
-		const activeDocument = this.cache.get(key) as ActiveDocument;
-		const dormantDocument = this.transformActiveDocument(activeDocument);
+		this.committingKeys.add(parsedKey);
 
-		let encodedDocument: string | DormantDocument = dormantDocument;
+		const activeDocument = this.cache.get(parsedKey) as A;
+		const processedDocument = this.applier.applyCommit(key, activeDocument);
 
-		const encoded = this.tryJsonEncode(dormantDocument);
-		if (!t.nil(encoded)) encodedDocument = encoded;
+		const dormantDocument = JSON.stringify(processedDocument) ?? processedDocument;
+		try {
+			this.performer.performSet(parsedKey, dormantDocument);
+			if (!soft) this.uncache(key);
+		} catch (e) {
+			throw e;
+		} finally {
+			this.committingKeys.delete(parsedKey);
+		}
 
-		this.store.SetAsync(key, encodedDocument);
-
-		if (!soft) this.delete(key);
-		this.committingKeys.delete(key);
+		return this;
 	}
 
 	/**
-	 * Asynchronously commits all the keys in the warehouse.
-	 * @see {@link Warehouse.commit}
+	 * Asynchronously commits all cached documents to the store.
 	 *
-	 * @param soft If true, the value will not be deleted from the cache.
-	 * @returns A promise that resolves when all keys have been committed.
+	 * @param soft If true, documents will not be deleted from the cache.
+	 * @returns A promise that resolves when all documents have been committed.
 	 */
 	public commitAll(soft = false) {
 		const promises: Promise<void>[] = [];
 
-		for (const [key, _] of this.cache) {
+		this.cache.forEach((_, k) => {
 			const promise = new Promise<void>((resolve) => {
-				this.commit(key, soft);
+				this.commit(k, soft);
 				resolve();
 			});
 
 			promises.push(promise);
-		}
+		});
 
-		return Promise.all(promises);
+		return Promise.all<typeof promises>(promises);
 	}
 
 	/**
-	 * Deletes a key from the cache but does not commit it.
-	 * This is useful when there was an error in the loading process
-	 * and the data in the store should not be overwritten.
-	 *
-	 * @param rawKey The key to delete.
-	 */
-	public release(rawKey: string | Player) {
-		const key = Warehouse.transformKey(rawKey);
-		if (!key) throw `The given key ('${rawKey}') is invalid.`;
-		this.delete(key);
-	}
-
-	/**
-	 * Deletes a key from the internal cache.
-	 * To also commit the key, use {@link Warehouse.commit}.
+	 * Deletes the document associated with the given key from the cache
+	 * but does not commit it to the store.
 	 *
 	 * @param key The key to delete.
 	 */
-	protected delete(key: string) {
-		if (!this.cache.has(key)) return;
-		const value = this.cache.get(key)! as ActiveDocument;
-		this.cache.delete(key);
-		this.keyDeleteSignal.Fire(key, value);
+	public release(key: Key) {
+		this.uncache(key);
+		return this;
 	}
 
 	/**
-	 * Attempts to decode a string as JSON.
+	 * Deletes the document associated with the given key from the cache.
 	 *
-	 * @param encodedData The raw JSON string to decode.
-	 * @returns The decoded JSON table, or undefined if the string is not valid JSON.
+	 * @param key The key to delete.
 	 */
-	protected tryJsonDecode(encodedData: string) {
-		try {
-			const decodedData = HttpService.JSONDecode(encodedData);
-			if (t.nil(decodedData)) return;
-			return decodedData as DormantDocument;
-		} catch {}
+	private uncache(key: Key) {
+		const parsedKey = new KeyValidator(key).asValueKey();
+
+		if (!this.cache.has(parsedKey)) return this;
+		const document = this.cache.get(parsedKey) as A;
+		this.cache.delete(parsedKey);
+		this.deletedPing.fire(key, document);
+		return this;
 	}
 
 	/**
-	 * Attempts to encode an table as JSON.
-	 *
-	 * @param decodedData The table to encode.
-	 * @returns The encoded JSON string, or undefined if the table cannot be encoded.
+	 * Returns the name of the warehouse.
 	 */
-	protected tryJsonEncode(decodedData: any) {
-		if (!t.table(decodedData)) return;
-
-		try {
-			const encodedData = HttpService.JSONEncode(decodedData);
-			if (t.nil(encodedData)) return;
-			return encodedData as string;
-		} catch {}
+	public getName() {
+		return this.name;
 	}
 
 	/**
-	 * Transforms a dormant document into an active document.
-	 *
-	 * @param document The dormant document to transform.
-	 * @returns The active document.
-	 */
-	protected transformDormantDocument(document: DormantDocument) {
-		const transformedDocument = this.postLoadProcessor?.(document) ?? document;
-
-		if (t.table(this.template) && t.table(transformedDocument)) {
-			return { ...this.template, ...transformedDocument };
-		}
-
-		return transformedDocument as ActiveDocument;
-	}
-
-	/**
-	 * Transforms an active document into a dormant document.
-	 *
-	 * @param document The active document to transform.
-	 * @returns The dormant document.
-	 */
-	protected transformActiveDocument(document: ActiveDocument) {
-		const transformedDocument = this.preCommitProcessor?.(document) ?? document;
-		return transformedDocument as DormantDocument;
-	}
-
-	/**
-	 * Attempts to transform the given key into a valid key.
-	 *
-	 * @param rawKey The key to transform.
-	 * @returns The transformed key, or undefined if the key is invalid.
-	 */
-	public static transformKey(rawKey: string | Player) {
-		const key = t.string(rawKey) ? rawKey : tostring(rawKey.UserId);
-		if (!key) return;
-		const [result, _] = string.gsub(key, '%s+', '');
-		if (!result) return;
-		return result;
-	}
-
-	/**
-	 * Decides the appropriate run mode for the warehouse.
-	 * When running in studio, it will always be dev mode unless
-	 * explicitly set otherwise.
-	 *
-	 * @param runMode The run mode to use, can be omitted.
-	 */
-	public static decideRunMode(runMode?: RunMode) {
-		return t.nil(runMode) ? (RunService.IsStudio() ? RunMode.DEV : RunMode.PROD) : runMode;
-	}
-
-	/**
-	 * Returns the internal warehouse key.
-	 */
-	public getKey() {
-		return this.key;
-	}
-
-	/**
-	 * Returns the internal DataStore.
-	 * If not running in dev mode, this will return nothing.
+	 * Returns the store of the warehouse.
+	 * This will not return anything if the run mode is not {@link RunMode.DEV}.
 	 */
 	public getStore() {
 		if (this.runMode === RunMode.DEV) return this.store;
 	}
 
 	/**
-	 * Returns the mode the warehouse is running in.
+	 * Returns the run mode of the warehouse.
 	 */
 	public getRunMode() {
 		return this.runMode;
 	}
 
 	/**
-	 * Connects a handler to the key update signal and returns the connection.
+	 * Sets the processor of the warehouse.
+	 * @see {@link Processor}
 	 */
-	public onKeyUpdate(handler: KeyUpdateHandler<ActiveDocument>) {
-		return this.keyUpdateSignal.Connect(handler);
+	public setProcessor(processor: Processor) {
+		this.processor = processor;
+		return this;
 	}
 
 	/**
-	 * Connects a handler to the key delete signal and returns the connection.
-	 */
-	public onKeyDelete(handler: KeyDeleteHandler<ActiveDocument>) {
-		return this.keyDeleteSignal.Connect(handler);
-	}
-
-	/**
-	 * Sets a processor that is called after the data is loaded from the store.
-	 * This can be useful to transform the data before it is used, to apply
-	 * things like serialization.
-	 *
-	 * This will **NOT** be called when there is no data in the store for the key,
-	 * in this case the value will always be the template, and the processor is not needed.
-	 */
-	public setPostLoadProcessor(processor: PostLoadProcessor<ActiveDocument, DormantDocument>) {
-		this.postLoadProcessor = processor;
-	}
-
-	/**
-	 * Sets a processor that is called before the data is committed to the store.
-	 * This can be useful to transform the data before it is saved, to apply
-	 * things like serialization.
-	 */
-	public setPreCommitProcessor(processor: PreCommitProcessor<ActiveDocument, DormantDocument>) {
-		this.preCommitProcessor = processor;
-	}
-
-	/**
-	 * Adds transformers to the warehouse.
-	 * These are used to transform updates before they are applied.
-	 *
-	 * @param transformers The transformers to add.
+	 * Adds the specified transformers to the warehouse.
 	 */
 	public addTransformers(...transformers: Transformer[]) {
-		const existingTransformers = this.transformers;
-		const newTransformers = [...existingTransformers, ...transformers];
-		this.transformers = newTransformers;
+		this.transformers = [...this.transformers, ...transformers];
+		return this;
 	}
 
 	/**
-	 * Adds guards to the warehouse.
-	 * These are used to validate updates before they are applied.
-	 *
-	 * @param guards The guards to add.
+	 * Removes the specified transformer from the warehouse.
+	 */
+	public removeTransformer(transformer: Transformer) {
+		this.transformers = this.transformers.filter((t) => t !== transformer);
+		return this;
+	}
+
+	/**
+	 * Adds the specified guards to the warehouse.
 	 */
 	public addGuards(...guards: Guard[]) {
-		const existingGuards = this.guards;
-		const newGuards = [...existingGuards, ...guards];
-		this.guards = newGuards;
+		this.guards = [...this.guards, ...guards];
+		return this;
+	}
+
+	/**
+	 * Removes the specified guard from the warehouse.
+	 */
+	public removeGuard(guard: Guard) {
+		this.guards = this.guards.filter((g) => g !== guard);
+		return this;
 	}
 }

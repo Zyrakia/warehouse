@@ -1,7 +1,7 @@
 {
     "name": "@rbxts/warehouse",
     "description": "A Roblox DataStore abstraction library.",
-    "version": "0.2.2",
+    "version": "0.0.0",
     "main": "build/init.lua",
     "license": "MIT",
     "scripts": {
@@ -37,8 +37,10 @@
     "dependencies": {
         "@rbxts/mockdatastoreservice": "^1.0.2",
         "@rbxts/object-utils": "^1.0.4",
+        "@rbxts/ping": "^2.2.2",
+        "@rbxts/rust-classes": "^0.11.0-beta.1",
         "@rbxts/services": "^1.2.0",
-        "@rbxts/signal": "^1.0.3",
+        "@rbxts/string-utils": "^1.0.3",
         "@rbxts/t": "^2.2.1",
         "@rbxts/testez": "^0.3.1-ts.6"
     },

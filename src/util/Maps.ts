@@ -1,3 +1,5 @@
+import { Entry } from '../types/Entry';
+
 export namespace Maps {
 	/**
 	 * Converts a map to an array of entries.
@@ -5,8 +7,8 @@ export namespace Maps {
 	 * @param map The map to convert.
 	 * @returns The array of entries.
 	 */
-	export function mapToEntries<K, V>(map: Map<K, V>): [K, V][] {
-		const entries: [K, V][] = [];
+	export function mapToEntries<K, V>(map: Map<K, V>) {
+		const entries: Entry<K, V>[] = [];
 
 		map.forEach((value, key) => {
 			entries.push([key, value]);
@@ -21,7 +23,7 @@ export namespace Maps {
 	 * @param entries The array of entries to convert.
 	 * @returns The map.
 	 */
-	export function entriesToMap<K, V>(entries: [K, V][]): Map<K, V> {
+	export function entriesToMap<K, V>(entries: Entry<K, V>[]): Map<K, V> {
 		const map = new Map<K, V>();
 
 		for (const entry of entries) {
