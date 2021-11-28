@@ -1,4 +1,5 @@
 import { DataStoreService } from '@rbxts/services';
+
 import { StoreMethod } from '../types/StoreMethod';
 
 export namespace BudgetManager {

@@ -1,11 +1,12 @@
-import { Maps } from '../util/Maps';
-import { RunMode } from '../types/RunMode';
-import { Warehouse } from './Warehouse';
-import { Entry } from '../types/Entry';
-import { SortOrder } from '../types/SortOrder';
-import { OrderedDataStorePerformer } from '../performer/OrderedDataStorePerformer';
 import { Ping } from '@rbxts/ping';
+
+import { OrderedDataStorePerformer } from '../performer/OrderedDataStorePerformer';
 import { KeyValidator } from '../safety/KeyValidator';
+import { Entry } from '../types/Entry';
+import { RunMode } from '../types/RunMode';
+import { SortOrder } from '../types/SortOrder';
+import { Maps } from '../util/Maps';
+import { Warehouse } from './Warehouse';
 
 /**
  * Acts as a normal warehuse but has ordered functionality.

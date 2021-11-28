@@ -1,4 +1,5 @@
 import Object from '@rbxts/object-utils';
+
 import { Dictionary, DictionaryKeyof } from '../types/Dictionary';
 
 export namespace Dictionaries {

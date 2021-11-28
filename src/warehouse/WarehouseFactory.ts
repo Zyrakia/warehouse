@@ -1,14 +1,16 @@
+import { Dictionary, Error } from 'index';
+
 import * as MOCk from '@rbxts/mockdatastoreservice';
 import { DataStoreService, RunService } from '@rbxts/services';
 import { t } from '@rbxts/t';
+
 import { NameValidator } from '../safety/NameValidator';
-import { Log } from '../util/Log';
 import { RunMode } from '../types/RunMode';
+import { Log } from '../util/Log';
+import { DictionaryWarehouse } from './DictionaryWarehouse';
+import { OrderedWarehouse } from './OrderedWarehouse';
 import { Warehouse } from './Warehouse';
 import { WarehouseHolder } from './WarehouseHolder';
-import { OrderedWarehouse } from './OrderedWarehouse';
-import { Dictionary, Error } from 'index';
-import { DictionaryWarehouse } from './DictionaryWarehouse';
 
 export namespace WarehouseFactory {
 	/**

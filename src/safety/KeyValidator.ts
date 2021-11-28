@@ -1,4 +1,5 @@
 import { t } from '@rbxts/t';
+
 import { KeyError } from '../error/KeyError';
 import { Key } from '../types/Key';
 import { String } from '../util/String';

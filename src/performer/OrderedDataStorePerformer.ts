@@ -1,9 +1,9 @@
 import { Error } from '../error/Error';
 import { BudgetManager } from '../safety/BudgetManager';
+import { Retrier } from '../safety/Retrier';
 import { OEntry } from '../types/Entry';
 import { SortOrder } from '../types/SortOrder';
 import { StoreMethod } from '../types/StoreMethod';
-import { Retrier } from '../safety/Retrier';
 
 export class OrderedDataStorePerformer {
 	public constructor(private store: OrderedDataStore) {}

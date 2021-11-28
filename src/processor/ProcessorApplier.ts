@@ -1,4 +1,5 @@
 import { t } from '@rbxts/t';
+
 import { Processor } from '../processor/Processor';
 import { Key } from '../types/Key';
 

@@ -1,4 +1,5 @@
 import { t } from '@rbxts/t';
+
 import { NameError } from '../error/NameError';
 import { String } from '../util/String';
 
