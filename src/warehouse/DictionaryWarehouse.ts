@@ -179,17 +179,3 @@ export class DictionaryWarehouse<A extends Dict, D extends Dict = A> extends War
 		return ping.connector;
 	}
 }
-
-interface Test {
-	a: number;
-	b: string;
-}
-
-const warehouse = new DictionaryWarehouse<Test>(
-	'test',
-	undefined,
-	DataStoreService.GetDataStore('test'),
-	RunMode.DEV,
-);
-
-warehouse.update('test', { a: 1, b: 'test' });
